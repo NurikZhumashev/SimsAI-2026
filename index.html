@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Плавная ходьба</title>
+    <title>Sims AI - Умная Карта</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
@@ -18,7 +18,7 @@
         const game = new Phaser.Game(config);
         
         let hero;
-        let moveTween = null; // Переменная для хранения нашего плавного движения
+        let moveTween = null;
 
         function preload() {
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
@@ -31,46 +31,66 @@
             const tileWidth = 32;  
             const tileHeight = 16; 
 
+            // 🧠 НАША ПЕРВАЯ АРХИТЕКТУРА ДАННЫХ
+            // 0 - свободный пол
+            // 1 - стена / препятствие
+            const levelMap = [
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0]
+            ];
+
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
                     let isoX = startX + (x - y) * tileWidth;
                     let isoY = startY + (x + y) * tileHeight;
 
+                    // Читаем данные из нашей карты
+                    let tileType = levelMap[y][x];
                     let tile = this.add.image(isoX, isoY, 'tile');
-                    tile.setInteractive();
 
-                    tile.on('pointerover', () => tile.setTint(0x00ff00));
-                    tile.on('pointerout', () => tile.clearTint());
-                    
-                    tile.on('pointerdown', () => {
-                        tile.setTint(0xff0000); 
+                    if (tileType === 1) {
+                        // ЭТО ПРЕПЯТСТВИЕ
+                        tile.setTint(0x555555); // Красим в темно-серый "бетон"
+                        tile.y -= 8; // Слегка приподнимаем для эффекта объема
+                    } else {
+                        // ЭТО СВОБОДНЫЙ ПОЛ
+                        tile.setInteractive();
 
-                        // Разворачиваем персонажа
-                        hero.flipX = (isoX < hero.x);
+                        tile.on('pointerover', () => tile.setTint(0x00ff00));
+                        tile.on('pointerout', () => tile.clearTint());
+                        
+                        tile.on('pointerdown', () => {
+                            tile.setTint(0xff0000); 
+                            hero.flipX = (isoX < hero.x);
 
-                        // Считаем дистанцию, чтобы скорость всегда была одинаковой
-                        let distance = Phaser.Math.Distance.Between(hero.x, hero.y, isoX, isoY);
-                        let duration = (distance / 200) * 1000; // 200 - это скорость
+                            let distance = Phaser.Math.Distance.Between(hero.x, hero.y, isoX, isoY);
+                            let duration = (distance / 200) * 1000;
 
-                        // Если он уже куда-то шел - отменяем старый приказ
-                        if (moveTween) moveTween.stop();
+                            if (moveTween) moveTween.stop();
 
-                        // ЗАПУСКАЕМ ИДЕАЛЬНО ПЛАВНОЕ ДВИЖЕНИЕ
-                        moveTween = this.tweens.add({
-                            targets: hero,
-                            x: isoX,
-                            y: isoY,
-                            duration: duration,
-                            ease: 'Linear' // Идем равномерно, без ускорений
+                            moveTween = this.tweens.add({
+                                targets: hero,
+                                x: isoX,
+                                y: isoY,
+                                duration: duration,
+                                ease: 'Linear'
+                            });
                         });
-                    });
+                    }
                 }
             }
 
+            // Ставим героя на стартовую позицию (клетка 0:0)
             hero = this.add.sprite(startX, startY, 'hero');
             hero.setScale(1.5);
             
-            this.add.text(20, 20, "Плавное движение (Твины) активировано!", { fontSize: '18px', fill: '#0f0' });
+            this.add.text(20, 20, "Карта загружена. Серые блоки - препятствия.", { fontSize: '18px', fill: '#0f0' });
         }
     </script>
 </body>
