@@ -52,9 +52,13 @@ async function create() {
             let tile = this.add.image(iX, iY, 'tile');
             
             // Отрисовка объектов
-            if (levelMap[r][c] === 1) { tile.setTint(0x333333); tile.y -= 4; }
-            else if (levelMap[r][c] === 2) { tile.setTint(0x0000ff); }
-            else if (levelMap[r][c] === 3) { tile.setTint(0xffffff); } // Белый холодильник
+            if (levelMap[r][c] === 1) { 
+    tile.setTint(0x333333); tile.y -= 4; 
+} else if (levelMap[r][c] === 2) { 
+    tile.setTint(0x0000ff); // Синяя кровать
+} else if (levelMap[r][c] === 3) { 
+    tile.setTint(0xffffff); // Белый холодильник
+}
 
             tile.setInteractive().on('pointerdown', async () => {
                 if (isBuild) {
@@ -85,11 +89,11 @@ async function create() {
             });
 
             tile.on('pointerover',()=>tile.setTint(0x00ff00)).on('pointerout',()=>{
-                if (levelMap[r][c] === 1) tile.setTint(0x333333);
-                else if (levelMap[r][c] === 2) tile.setTint(0x0000ff);
-                else if (levelMap[r][c] === 3) tile.setTint(0xffffff);
-                else tile.clearTint();
-            });
+    if (levelMap[r][c] === 1) tile.setTint(0x333333);
+    else if (levelMap[r][c] === 2) tile.setTint(0x0000ff);
+    else if (levelMap[r][c] === 3) tile.setTint(0xffffff); // Чтобы не исчезал после наведения
+    else tile.clearTint();
+});
         }
     }
 
