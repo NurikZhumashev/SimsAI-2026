@@ -2,50 +2,37 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Редактор Мира</title>
+    <title>Sims AI - Редактор</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
-    <style> 
+    <style>
         body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
-        #ui { position: absolute; top: 10px; left: 10px; z-index: 10; display: flex; gap: 10px; }
-        button { padding: 10px 20px; cursor: pointer; background: #444; color: white; border: 1px solid #666; border-radius: 5px; }
-        button.active { background: #28a745; border-color: #fff; }
-    </script>
+        #ui { position: absolute; top: 10px; left: 10px; z-index: 100; display: flex; gap: 10px; }
+        button { padding: 8px 15px; cursor: pointer; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
+        button.active { background: #28a745; border-color: #fff; font-weight: bold; }
+    </style>
 </head>
 <body>
     <div id="ui">
-        <button id="walkBtn" class="active">ПОХОДКА (WALK)</button>
-        <button id="buildBtn">СТРОЙКА (BUILD)</button>
+        <button id="wBtn" class="active" onclick="setMode(false)">ХОДИТЬ</button>
+        <button id="bBtn" onclick="setMode(true)">СТРОИТЬ</button>
     </div>
 
     <script>
+        let isBuild = false;
+        function setMode(m) {
+            isBuild = m;
+            document.getElementById('wBtn').className = m ? '' : 'active';
+            document.getElementById('bBtn').className = m ? 'active' : '';
+        }
+
         const config = {
             type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight,
             scene: { preload: preload, create: create }
         };
 
         const game = new Phaser.Game(config);
-        let hero, currentTween, sceneRef;
-        let curGrid = { x: 0, y: 0 };
-        let activePath = [];
-        let nextTarget = null;
-        let isBuildMode = false; // Глобальный флаг режима
-
-        const levelMap = [
-            [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0]
-        ];
-
-        // Кнопки интерфейса
-        document.getElementById('walkBtn').onclick = function() {
-            isBuildMode = false;
-            this.classList.add('active');
-            document.getElementById('buildBtn').classList.remove('active');
-        };
-        document.getElementById('buildBtn').onclick = function() {
-            isBuildMode = true;
-            this.classList.add('active');
-            document.getElementById('walkBtn').classList.remove('active');
-        };
+        let hero, currentTween, sceneRef, curGrid = { x: 0, y: 0 }, activePath = [], nextTarget = null;
+        const levelMap = Array(8).fill().map(() => Array(8).fill(0));
 
         function preload() {
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
@@ -54,84 +41,57 @@
 
         function create() {
             sceneRef = this;
-            const startX = window.innerWidth / 2, startY = 150, tW = 32, tH = 16;
+            const sX = window.innerWidth / 2, sY = 150, tW = 32, tH = 16;
 
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
-                    let iX = startX + (c - r) * tW, iY = startY + (c + r) * tH;
+                    let iX = sX + (c - r) * tW, iY = sY + (c + r) * tH;
                     let tile = this.add.image(iX, iY, 'tile');
-
                     tile.setInteractive().on('pointerdown', () => {
-                        if (isBuildMode) {
-                            // РЕЖИМ СТРОЙКИ: Переключаем 0 и 1
-                            if (c === curGrid.x && r === curGrid.y) return; // Нельзя замуровать себя
-
-                            if (levelMap[r][c] === 0) {
-                                levelMap[r][c] = 1;
-                                tile.setTint(0x333333);
-                                tile.y -= 4;
-                            } else {
-                                levelMap[r][c] = 0;
-                                tile.setTint(0xffffff);
-                                tile.y += 4;
-                            }
+                        if (isBuild) {
+                            if (c === curGrid.x && r === curGrid.y) return;
+                            let isWall = levelMap[r][c] === 0;
+                            levelMap[r][c] = isWall ? 1 : 0;
+                            tile.setTint(isWall ? 0x333333 : 0xffffff);
+                            tile.y += isWall ? -4 : 4;
                         } else {
-                            // РЕЖИМ ХОДЬБЫ (твой старый код)
                             if (levelMap[r][c] === 1) return;
-                            let startFrom = nextTarget ? nextTarget : curGrid;
-                            let newPath = findPath(startFrom.x, startFrom.y, c, r);
-                            if (newPath) {
-                                activePath = newPath;
-                                if (!currentTween || !currentTween.isPlaying()) walk(0, startX, startY, tW, tH);
-                            }
+                            let start = nextTarget || curGrid;
+                            let path = findPath(start.x, start.y, c, r);
+                            if (path) { activePath = path; if (!currentTween || !currentTween.isPlaying()) walk(0, sX, sY, tW, tH); }
                         }
                     });
-                    
-                    tile.on('pointerover', () => tile.setTint(0x00ff00))
-                        .on('pointerout', () => {
-                            if (levelMap[r][c] === 1) tile.setTint(0x333333);
-                            else tile.clearTint();
-                        });
+                    tile.on('pointerover',()=>tile.setTint(0x00ff00)).on('pointerout',()=>{tile.setTint(levelMap[r][c]===1?0x333333:0xffffff)});
                 }
             }
-            hero = this.add.sprite(startX, startY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
+            hero = this.add.sprite(sX, sY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
         }
 
-        function walk(index, sX, sY, tW, tH) {
-            if (index >= activePath.length) { nextTarget = null; return; }
-            nextTarget = activePath[index];
-            if (nextTarget.x === curGrid.x && nextTarget.y === curGrid.y) {
-                walk(index + 1, sX, sY, tW, tH); return;
-            }
-            
-            // ПРОВЕРКА: Не построили ли стену прямо перед носом, пока мы шли?
-            if (levelMap[nextTarget.y][nextTarget.x] === 1) {
-                nextTarget = null; activePath = []; return; 
-            }
-
-            let dist = Math.sqrt(Math.pow(nextTarget.x - curGrid.x, 2) + Math.pow(nextTarget.y - curGrid.y, 2));
+        function walk(idx, sX, sY, tW, tH) {
+            if (idx >= activePath.length) { nextTarget = null; return; }
+            nextTarget = activePath[idx];
+            if (nextTarget.x === curGrid.x && nextTarget.y === curGrid.y) return walk(idx + 1, sX, sY, tW, tH);
+            if (levelMap[nextTarget.y][nextTarget.x] === 1) { nextTarget = null; activePath = []; return; }
+            let d = Math.sqrt(Math.pow(nextTarget.x-curGrid.x,2)+Math.pow(nextTarget.y-curGrid.y,2));
             let tX = sX + (nextTarget.x - nextTarget.y) * tW, tY = sY + (nextTarget.x + nextTarget.y) * tH;
             hero.flipX = (tX < hero.x);
             currentTween = sceneRef.tweens.add({
-                targets: hero, x: tX, y: tY, duration: 250 * dist,
-                onComplete: () => { curGrid = { x: nextTarget.x, y: nextTarget.y }; walk(index + 1, sX, sY, tW, tH); }
+                targets: hero, x: tX, y: tY, duration: 250 * d,
+                onComplete: () => { curGrid = {x:nextTarget.x, y:nextTarget.y}; walk(idx + 1, sX, sY, tW, tH); }
             });
         }
 
         function findPath(sx, sy, ex, ey) {
-            let queue = [[{x: sx, y: sy}]], visited = new Set([sx + "," + sy]);
-            while (queue.length > 0) {
-                let p = queue.shift(), last = p[p.length - 1];
-                if (last.x === ex && last.y === ey) return p;
-                let neighbors = [{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0},{x:1,y:1},{x:1,y:-1},{x:-1,y:1},{x:-1,y:-1}];
-                for (let d of neighbors) {
-                    let nx = last.x + d.x, ny = last.y + d.y;
+            let q = [[{x: sx, y: sy}]], v = new Set([sx + "," + sy]);
+            while (q.length > 0) {
+                let p = q.shift(), l = p[p.length - 1];
+                if (l.x === ex && l.y === ey) return p;
+                let dirs = [{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0},{x:1,y:1},{x:1,y:-1},{x:-1,y:1},{x:-1,y:-1}];
+                for (let d of dirs) {
+                    let nx = l.x + d.x, ny = l.y + d.y;
                     if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx]===0) {
-                        if (Math.abs(d.x)===1 && Math.abs(d.y)===1 && (levelMap[last.y][nx]===1 || levelMap[ny][last.x]===1)) continue;
-                        if (!visited.has(nx + "," + ny)) {
-                            visited.add(nx + "," + ny);
-                            queue.push([...p, {x: nx, y: ny}]);
-                        }
+                        if (Math.abs(d.x)===1 && Math.abs(d.y)===1 && (levelMap[l.y][nx]===1 || levelMap[ny][l.x]===1)) continue;
+                        if (!v.has(nx + "," + ny)) { v.add(nx + "," + ny); q.push([...p, {x: nx, y: ny}]); }
                     }
                 }
             }
