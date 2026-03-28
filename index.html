@@ -2,13 +2,19 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Нурик</title>
+    <title>Sims AI - Состояние Нурика</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style>
         body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
         #ui { position: absolute; top: 10px; left: 10px; z-index: 100; display: flex; gap: 10px; }
-        button { padding: 8px 15px; cursor: pointer; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
+        button { padding: 8px 15px; cursor: pointer; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; transition: 0.2s; }
         button.active { background: #28a745; border-color: #fff; font-weight: bold; }
+        
+        /* Индикатор энергии в углу */
+        #status-panel { position: absolute; top: 10px; right: 10px; z-index: 100; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; border: 1px solid #444; width: 150px; }
+        .stat-label { color: #aaa; fontSize: 12px; margin-bottom: 5px; display: block; }
+        .bar-bg { width: 100%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; }
+        #energy-bar { width: 100%; height: 100%; background: #28a745; transition: width 0.3s, background 0.3s; }
     </style>
 </head>
 <body>
@@ -17,12 +23,30 @@
         <button id="bBtn" onclick="setMode(true)">СТРОИТЬ</button>
     </div>
 
+    <div id="status-panel">
+        <span class="stat-label">ЭНЕРГИЯ НУРИКА</span>
+        <div class="bar-bg">
+            <div id="energy-bar"></div>
+        </div>
+    </div>
+
     <script>
         let isBuild = false;
+        let energy = 100;
+
         function setMode(m) {
             isBuild = m;
             document.getElementById('wBtn').className = m ? '' : 'active';
             document.getElementById('bBtn').className = m ? 'active' : '';
+        }
+
+        // Обновление полоски в интерфейсе
+        function updateEnergyUI() {
+            const bar = document.getElementById('energy-bar');
+            bar.style.width = energy + '%';
+            if (energy > 50) bar.style.background = '#28a745';
+            else if (energy > 20) bar.style.background = '#ffc107';
+            else bar.style.background = '#dc3545';
         }
 
         const config = {
@@ -57,6 +81,13 @@
                             tile.y += isWall ? -4 : 4;
                         } else {
                             if (levelMap[r][c] === 1) return;
+                            
+                            // ПРОВЕРКА ЭНЕРГИИ
+                            if (energy <= 0) {
+                                console.log("Нурику нужен отдых!");
+                                return;
+                            }
+
                             let start = movingTo ? movingTo : curGrid;
                             let path = findPath(start.x, start.y, c, r);
                             if (path && path.length > 1) {
@@ -69,19 +100,14 @@
                 }
             }
 
-            // Создаем Нурика
             hero = this.add.sprite(sX, sY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
-            
-            // Создаем Имя (привяжем его координаты в update)
             heroLabel = this.add.text(sX, sY - 45, 'Нурик', { 
-                fontSize: '14px', 
-                fill: '#ffffff', 
-                backgroundColor: 'rgba(0,0,0,0.6)',
-                padding: { x: 4, y: 2 }
+                fontSize: '14px', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.6)', padding: { x: 4, y: 2 }
             }).setOrigin(0.5);
+            
+            updateEnergyUI();
         }
 
-        // Кадровая синхронизация имени и героя
         function update() {
             if (hero && heroLabel) {
                 heroLabel.x = hero.x;
@@ -90,17 +116,29 @@
         }
 
         function walk(sX, sY, tW, tH) {
-            if (futurePath.length === 0) { movingTo = null; return; }
+            if (futurePath.length === 0 || energy <= 0) { 
+                movingTo = null; 
+                return; 
+            }
+
             movingTo = futurePath.shift();
             if (levelMap[movingTo.y][movingTo.x] === 1) { movingTo = null; futurePath = []; return; }
 
+            // ТРАТИМ ЭНЕРГИЮ ЗА ШАГ
+            energy -= 2;
+            if (energy < 0) energy = 0;
+            updateEnergyUI();
+
             let d = Math.sqrt(Math.pow(movingTo.x - curGrid.x, 2) + Math.pow(movingTo.y - curGrid.y, 2));
             let tX = sX + (movingTo.x - movingTo.y) * tW, tY = sY + (movingTo.x + movingTo.y) * tH;
-            hero.flipX = (tX < hero.x);
+            hero.flipX = (targetX < hero.x); // Тут была опечатка tX
 
             sceneRef.tweens.add({
                 targets: hero, x: tX, y: tY, duration: 250 * d,
-                onComplete: () => { curGrid = { x: movingTo.x, y: movingTo.y }; walk(sX, sY, tW, tH); }
+                onComplete: () => { 
+                    curGrid = { x: movingTo.x, y: movingTo.y }; 
+                    walk(sX, sY, tW, tH); 
+                }
             });
         }
 
