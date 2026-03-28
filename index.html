@@ -2,11 +2,21 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Smooth Pivot</title>
+    <title>Sims AI - Редактор Мира</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
-    <style> body { margin: 0; background: #111; overflow: hidden; } </style>
+    <style> 
+        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
+        #ui { position: absolute; top: 10px; left: 10px; z-index: 10; display: flex; gap: 10px; }
+        button { padding: 10px 20px; cursor: pointer; background: #444; color: white; border: 1px solid #666; border-radius: 5px; }
+        button.active { background: #28a745; border-color: #fff; }
+    </script>
 </head>
 <body>
+    <div id="ui">
+        <button id="walkBtn" class="active">ПОХОДКА (WALK)</button>
+        <button id="buildBtn">СТРОЙКА (BUILD)</button>
+    </div>
+
     <script>
         const config = {
             type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight,
@@ -17,12 +27,25 @@
         let hero, currentTween, sceneRef;
         let curGrid = { x: 0, y: 0 };
         let activePath = [];
-        let nextTarget = null; // Точка, в которую мы СЕЙЧАС шагаем
+        let nextTarget = null;
+        let isBuildMode = false; // Глобальный флаг режима
 
         const levelMap = [
-            [0,0,0,0,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,1,0,0], [0,0,0,0,0,1,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0]
+            [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0]
         ];
+
+        // Кнопки интерфейса
+        document.getElementById('walkBtn').onclick = function() {
+            isBuildMode = false;
+            this.classList.add('active');
+            document.getElementById('buildBtn').classList.remove('active');
+        };
+        document.getElementById('buildBtn').onclick = function() {
+            isBuildMode = true;
+            this.classList.add('active');
+            document.getElementById('walkBtn').classList.remove('active');
+        };
 
         function preload() {
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
@@ -38,57 +61,60 @@
                     let iX = startX + (c - r) * tW, iY = startY + (c + r) * tH;
                     let tile = this.add.image(iX, iY, 'tile');
 
-                    if (levelMap[r][c] === 1) { tile.setTint(0x333333); tile.y -= 4; }
-                    else {
-                        tile.setInteractive().on('pointerdown', () => {
-                            // Если мы уже идем, то новый путь строим от клетки, 
-                            // В КОТОРУЮ мы сейчас наступаем, а не от той, которую покинули.
+                    tile.setInteractive().on('pointerdown', () => {
+                        if (isBuildMode) {
+                            // РЕЖИМ СТРОЙКИ: Переключаем 0 и 1
+                            if (c === curGrid.x && r === curGrid.y) return; // Нельзя замуровать себя
+
+                            if (levelMap[r][c] === 0) {
+                                levelMap[r][c] = 1;
+                                tile.setTint(0x333333);
+                                tile.y -= 4;
+                            } else {
+                                levelMap[r][c] = 0;
+                                tile.setTint(0xffffff);
+                                tile.y += 4;
+                            }
+                        } else {
+                            // РЕЖИМ ХОДЬБЫ (твой старый код)
+                            if (levelMap[r][c] === 1) return;
                             let startFrom = nextTarget ? nextTarget : curGrid;
-                            
                             let newPath = findPath(startFrom.x, startFrom.y, c, r);
-                            
                             if (newPath) {
                                 activePath = newPath;
-                                // Если мы стояли на месте, запускаем движение
-                                if (!currentTween || !currentTween.isPlaying()) {
-                                    walk(0, startX, startY, tW, tH);
-                                }
+                                if (!currentTween || !currentTween.isPlaying()) walk(0, startX, startY, tW, tH);
                             }
+                        }
+                    });
+                    
+                    tile.on('pointerover', () => tile.setTint(0x00ff00))
+                        .on('pointerout', () => {
+                            if (levelMap[r][c] === 1) tile.setTint(0x333333);
+                            else tile.clearTint();
                         });
-                        tile.on('pointerover', () => tile.setTint(0x00ff00)).on('pointerout', () => tile.clearTint());
-                    }
                 }
             }
             hero = this.add.sprite(startX, startY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
         }
 
         function walk(index, sX, sY, tW, tH) {
-            if (index >= activePath.length) {
-                nextTarget = null;
-                return;
-            }
-
+            if (index >= activePath.length) { nextTarget = null; return; }
             nextTarget = activePath[index];
-            
-            // Если мы уже в этой клетке (нажали на ту же самую), идем к следующей
             if (nextTarget.x === curGrid.x && nextTarget.y === curGrid.y) {
-                walk(index + 1, sX, sY, tW, tH);
-                return;
+                walk(index + 1, sX, sY, tW, tH); return;
+            }
+            
+            // ПРОВЕРКА: Не построили ли стену прямо перед носом, пока мы шли?
+            if (levelMap[nextTarget.y][nextTarget.x] === 1) {
+                nextTarget = null; activePath = []; return; 
             }
 
             let dist = Math.sqrt(Math.pow(nextTarget.x - curGrid.x, 2) + Math.pow(nextTarget.y - curGrid.y, 2));
-            let targetX = sX + (nextTarget.x - nextTarget.y) * tW;
-            let targetY = sY + (nextTarget.x + nextTarget.y) * tH;
-
-            hero.flipX = (targetX < hero.x);
-
+            let tX = sX + (nextTarget.x - nextTarget.y) * tW, tY = sY + (nextTarget.x + nextTarget.y) * tH;
+            hero.flipX = (tX < hero.x);
             currentTween = sceneRef.tweens.add({
-                targets: hero, x: targetX, y: targetY,
-                duration: 250 * dist,
-                onComplete: () => {
-                    curGrid = { x: nextTarget.x, y: nextTarget.y };
-                    walk(index + 1, sX, sY, tW, tH);
-                }
+                targets: hero, x: tX, y: tY, duration: 250 * dist,
+                onComplete: () => { curGrid = { x: nextTarget.x, y: nextTarget.y }; walk(index + 1, sX, sY, tW, tH); }
             });
         }
 
