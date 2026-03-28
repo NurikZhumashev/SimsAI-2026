@@ -1,0 +1,6 @@
+{
+  "name": "simsai-game",
+  "scripts": {
+    "start": "npx serve -s ."
+  }
+}
