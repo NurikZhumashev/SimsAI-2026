@@ -1,4 +1,4 @@
-window.BACKEND_URL = "https://simsai-2026-production.up.railway.app";
+
 // Полное состояние Нурика
 let stars = 50;
 let energy = 100;
@@ -15,18 +15,18 @@ let hero, heroLabel;
 // Единый центр связи с сервером (Бронированная версия)
 async function performServerAction(actionType) {
     try {
-        const res = await fetch(`${BACKEND_URL}/action`, {
+        // ЖЕЛЕЗОБЕТОННАЯ ССЫЛКА ПРЯМО В ЗАПРОСЕ:
+        const res = await fetch(`https://simsai-2026-production.up.railway.app/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action_type: actionType })
         });
+        
         const data = await res.json();
         
-        // Если сервер вернул 500 ошибку или наш кастомный error
         if (!res.ok || data.status === "error") {
             showNotification(data.message || "Ошибка на сервере!", true);
         } else if (data.stats) {
-            // Если всё прошло идеально
             showNotification(data.message, false);
             stars = data.stats.stars;
             energy = data.stats.energy;
