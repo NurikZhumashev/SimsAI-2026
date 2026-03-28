@@ -2,9 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Умный Поиск Пути (A*)</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/easystarjs@0.4.4/build/easystar-0.4.4.min.js"></script>
+    <title>Sims AI - Умный Поиск Пути</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/easystarjs/0.4.4/easystar-0.4.4.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
 <body>
@@ -29,6 +29,12 @@
         }
 
         function create() {
+            // ПРОВЕРКА ЗАГРУЗКИ БИБЛИОТЕКИ
+            if (typeof EasyStar === 'undefined') {
+                this.add.text(20, 20, "ОШИБКА: Библиотека ИИ не загружена!\nПопробуй обновить страницу.", { fill: '#f00' });
+                return;
+            }
+
             const startX = window.innerWidth / 2;
             const startY = 150;
             const tileWidth = 32;  
@@ -45,9 +51,8 @@
                 [0, 0, 0, 0, 0, 0, 0, 0]
             ];
 
-            // 🎯 ВОТ ИСПРАВЛЕНИЕ: Используем правильное имя библиотеки easystarjs
-            let easystar = new easystarjs.js();
-            
+            // --- ТЕПЕРЬ ПРАВИЛЬНО: EasyStar.js ---
+            let easystar = new EasyStar.js();
             easystar.setGrid(levelMap);          
             easystar.setAcceptableTiles([0]);    
             easystar.enableDiagonals();          
@@ -72,7 +77,6 @@
                         
                         tile.on('pointerdown', () => {
                             if (isMoving) return; 
-                            
                             tile.setTint(0xff0000); 
 
                             easystar.findPath(heroGridX, heroGridY, x, y, function(path) {
@@ -92,24 +96,19 @@
             hero = this.add.sprite(startX, startY, 'hero');
             hero.setScale(1.5);
             
-            this.add.text(20, 20, "A* Pathfinding работает! Кликай за стену.", { fontSize: '18px', fill: '#0f0' });
+            this.add.text(20, 20, "A* Pathfinding готов! Кликай за серые блоки.", { fontSize: '18px', fill: '#0f0' });
 
             function moveCharacter(path, index) {
                 if (index >= path.length) {
                     isMoving = false; 
                     return;
                 }
-
                 let nextTile = path[index];
-                
                 heroGridX = nextTile.x;
                 heroGridY = nextTile.y;
-
                 let nextIsoX = startX + (nextTile.x - nextTile.y) * tileWidth;
                 let nextIsoY = startY + (nextTile.x + nextTile.y) * tileHeight;
-
                 hero.flipX = (nextIsoX < hero.x); 
-
                 scene.tweens.add({
                     targets: hero,
                     x: nextIsoX,
