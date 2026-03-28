@@ -1,12 +1,16 @@
-// 1. В САМОЕ НАЧАЛО: Адрес твоего сервера
+// 1. АДРЕС СЕРВЕРА (Убедись, что тут только один раз https://)
 const BACKEND_URL = "https://simsai-2026-production.up.railway.app"; 
 
-// 2. ФУНКЦИЯ ЗАГРУЗКИ: Спрашиваем сервер о стенах
+// 2. ФУНКЦИЯ ЗАГРУЗКИ
 async function loadDataFromServer() {
     try {
-        const response = await fetch(`https://${BACKEND_URL}/get_map`);
+        // Убрали лишнее https:// из шаблона, так как оно уже есть в константе
+        const response = await fetch(`${BACKEND_URL}/get_map`);
         return await response.json();
-    } catch (e) { return null; }
+    } catch (e) { 
+        console.error("Сервер молчит, Нурик живет в памяти браузера");
+        return null; 
+    }
 }
 
 const config = {
@@ -18,51 +22,52 @@ const config = {
 
 const game = new Phaser.Game(config);
 let levelMap = Array(8).fill().map(() => Array(8).fill(0));
-levelMap[7][0] = 2;
-levelMap[0][7] = 3;// Кровать Нурика
+
+// Объекты: 1-Стена, 2-Кровать, 3-Холодильник
+levelMap[7][0] = 2; // Кровать
+levelMap[0][7] = 3; // Холодильник
 
 function preload() {
     this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
     this.load.image('hero', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
 }
 
-// 3. ДОБАВЛЯЕМ async К CREATE
 async function create() {
     const scene = this;
     const sX = window.innerWidth / 2, sY = 150, tW = 32, tH = 16;
 
-    // 4. ЗАГРУЗКА ДАННЫХ: Ждем ответа от сервера перед отрисовкой
+    // ЗАГРУЗКА ДАННЫХ
     const data = await loadDataFromServer();
-if (data) {
-    data.walls.forEach(w => { levelMap[w[0]][w[1]] = 1; });
-    energy = data.energy;
-    hunger = data.hunger;
-}
-        levelMap[w[0]][w[1]] = 1; // Помечаем стены из базы на карте
-    });
+    if (data) {
+        data.walls.forEach(w => { 
+            levelMap[w[0]][w[1]] = 1; 
+        });
+        energy = data.energy;
+        hunger = data.hunger;
+    }
 
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
             let iX = sX + (c - r) * tW, iY = sY + (c + r) * tH;
             let tile = this.add.image(iX, iY, 'tile');
             
-            // Отрисовка: Стены (1) или Кровать (2)
+            // Отрисовка объектов
             if (levelMap[r][c] === 1) { tile.setTint(0x333333); tile.y -= 4; }
             else if (levelMap[r][c] === 2) { tile.setTint(0x0000ff); }
+            else if (levelMap[r][c] === 3) { tile.setTint(0xffffff); } // Белый холодильник
 
-            // 5. ОБНОВЛЯЕМ КЛИК (тоже делаем async)
             tile.setInteractive().on('pointerdown', async () => {
                 if (isBuild) {
-                    if ((c === curGrid.x && r === curGrid.y) || levelMap[r][c] === 2) return;
+                    // Нельзя строить там, где Нурик, кровать или холодильник
+                    if ((c === curGrid.x && r === curGrid.y) || levelMap[r][c] > 1) return;
                     
-                    // СОХРАНЯЕМ НА БЭКЕНД
                     try {
                         await fetch(`${BACKEND_URL}/save_wall`, {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify({ r: r, c: c })
                         });
-                    } catch(e) { console.log("Ошибка сохранения на сервер"); }
+                    } catch(e) { console.log("Ошибка сохранения"); }
 
                     let isWall = levelMap[r][c] === 0;
                     levelMap[r][c] = isWall ? 1 : 0;
@@ -82,6 +87,7 @@ if (data) {
             tile.on('pointerover',()=>tile.setTint(0x00ff00)).on('pointerout',()=>{
                 if (levelMap[r][c] === 1) tile.setTint(0x333333);
                 else if (levelMap[r][c] === 2) tile.setTint(0x0000ff);
+                else if (levelMap[r][c] === 3) tile.setTint(0xffffff);
                 else tile.clearTint();
             });
         }
@@ -92,17 +98,17 @@ if (data) {
         fontSize: '14px', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.6)', padding: { x: 4, y: 2 }
     }).setOrigin(0.5);
     
-    updateEnergyUI();
+    updateUI(); // Важно: вызываем общую функцию обновления
 
+    // Жизненный цикл Нурика
     setInterval(() => {
-    if (!movingTo) {
-        // Когда стоит, энергия чуть-чуть растет
-        if (energy < 100) energy = Math.min(100, energy + 1);
-        // А голод потихоньку падает всегда!
-        if (hunger > 0) hunger -= 1;
-        updateUI(); 
-    }
-}, 3000); // Раз в 3 секунды
+        if (!movingTo) {
+            if (energy < 100) energy = Math.min(100, energy + 1);
+            if (hunger > 0) hunger -= 1;
+            updateUI(); 
+        }
+    }, 3000); 
+} // Закрыли функцию create
 
 function update() {
     if (hero && heroLabel) {
