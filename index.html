@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Надежный Шаг</title>
+    <title>Sims AI - Плавная ходьба</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
@@ -12,21 +12,16 @@
             type: Phaser.AUTO,
             width: window.innerWidth,
             height: window.innerHeight,
-            physics: { default: 'arcade' },
-            scene: { preload: preload, create: create, update: update }
+            scene: { preload: preload, create: create }
         };
 
         const game = new Phaser.Game(config);
         
         let hero;
-        let target = new Phaser.Math.Vector2();
-        let isMoving = false;
+        let moveTween = null; // Переменная для хранения нашего плавного движения
 
         function preload() {
-            // Грузим пол
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
-            
-            // НАДЕЖНЫЙ АССЕТ: Этого парня Phaser всегда найдет. Обойдемся без анимации пока.
             this.load.image('hero', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
         }
 
@@ -36,7 +31,6 @@
             const tileWidth = 32;  
             const tileHeight = 16; 
 
-            // СТРОИМ ПОЛ
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
                     let isoX = startX + (x - y) * tileWidth;
@@ -50,39 +44,33 @@
                     
                     tile.on('pointerdown', () => {
                         tile.setTint(0xff0000); 
-                        
-                        // Задаем цель ровно в центр кристалла. character center is body center.
-                        target.x = isoX;
-                        target.y = isoY; 
 
-                        hero.flipX = (target.x < hero.x);
-                        this.physics.moveToObject(hero, target, 200); // Идем!
-                        
-                        isMoving = true;
+                        // Разворачиваем персонажа
+                        hero.flipX = (isoX < hero.x);
+
+                        // Считаем дистанцию, чтобы скорость всегда была одинаковой
+                        let distance = Phaser.Math.Distance.Between(hero.x, hero.y, isoX, isoY);
+                        let duration = (distance / 200) * 1000; // 200 - это скорость
+
+                        // Если он уже куда-то шел - отменяем старый приказ
+                        if (moveTween) moveTween.stop();
+
+                        // ЗАПУСКАЕМ ИДЕАЛЬНО ПЛАВНОЕ ДВИЖЕНИЕ
+                        moveTween = this.tweens.add({
+                            targets: hero,
+                            x: isoX,
+                            y: isoY,
+                            duration: duration,
+                            ease: 'Linear' // Идем равномерно, без ускорений
+                        });
                     });
                 }
             }
 
-            // СОЗДАЕМ ПЕРСОНАЖА (Синий человечек)
-            hero = this.physics.add.sprite(startX, startY, 'hero');
+            hero = this.add.sprite(startX, startY, 'hero');
             hero.setScale(1.5);
             
-            this.add.text(20, 20, "Кликай по кристаллам!", { fontSize: '18px', fill: '#0f0' });
-        }
-
-        function update() {
-            // Если идем - проверяем, дошли ли
-            if (isMoving) {
-                let distance = Phaser.Math.Distance.Between(hero.x, hero.y, target.x, target.y);
-                
-                // УСИЛЕННОЕ УСЛОВИЕ ОСТАНОВКИ (было <10, стало <25)
-                // Мы делаем "ворота" шире, чтобы физика точно успела сработать.
-                if (distance < 25) {
-                    hero.body.setVelocity(0, 0); // Явно обнуляем скорость
-                    hero.body.reset(target.x, target.y); // Размещаем идеально в цели
-                    isMoving = false;
-                }
-            }
+            this.add.text(20, 20, "Плавное движение (Твины) активировано!", { fontSize: '18px', fill: '#0f0' });
         }
     </script>
 </body>
