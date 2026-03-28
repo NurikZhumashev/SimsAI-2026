@@ -21,7 +21,7 @@ game_state = {
     "energy": 100,
     "hunger": 100, # Добавили голод
     "nurik_pos": {"x": 0, "y": 0}
-
+}
 class WallData(BaseModel):
     r: int
     c: int
