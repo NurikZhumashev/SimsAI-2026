@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Sims AI - Умный Поиск Пути (A*)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/easystarjs/0.4.4/easystar-0.4.4.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/easystarjs@0.4.4/build/easystar-0.4.4.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
 <body>
@@ -19,7 +19,6 @@
         const game = new Phaser.Game(config);
         
         let hero;
-        // Запоминаем, на какой клетке стоит герой
         let heroGridX = 0; 
         let heroGridY = 0;
         let isMoving = false;
@@ -46,15 +45,15 @@
                 [0, 0, 0, 0, 0, 0, 0, 0]
             ];
 
-            // --- НАСТРАИВАЕМ ИИ (EasyStar) ---
-            let easystar = new EasyStar.js();
-            easystar.setGrid(levelMap);          // Отдаем ИИ нашу карту
-            easystar.setAcceptableTiles([0]);    // Говорим, что ходить можно только по нулям (0)
-            easystar.enableDiagonals();          // Разрешаем ходить по диагонали
+            // 🎯 ВОТ ИСПРАВЛЕНИЕ: Используем правильное имя библиотеки easystarjs
+            let easystar = new easystarjs.js();
+            
+            easystar.setGrid(levelMap);          
+            easystar.setAcceptableTiles([0]);    
+            easystar.enableDiagonals();          
 
-            let scene = this; // Сохраняем ссылку на сцену для анимаций
+            let scene = this; 
 
-            // Строим пол
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
                     let isoX = startX + (x - y) * tileWidth;
@@ -71,22 +70,20 @@
                         tile.on('pointerover', () => tile.setTint(0x00ff00));
                         tile.on('pointerout', () => tile.clearTint());
                         
-                        // КЛИК ПО ПОЛУ
                         tile.on('pointerdown', () => {
-                            if (isMoving) return; // Блокируем новые клики, пока он идет
+                            if (isMoving) return; 
                             
                             tile.setTint(0xff0000); 
 
-                            // Просим ИИ найти путь от героя до точки клика
                             easystar.findPath(heroGridX, heroGridY, x, y, function(path) {
                                 if (path === null) {
                                     console.log("Путь заблокирован!");
                                 } else {
                                     isMoving = true;
-                                    moveCharacter(path, 0); // Запускаем шаги
+                                    moveCharacter(path, 0); 
                                 }
                             });
-                            easystar.calculate(); // Команда ИИ "Думай!"
+                            easystar.calculate(); 
                         });
                     }
                 }
@@ -97,34 +94,29 @@
             
             this.add.text(20, 20, "A* Pathfinding работает! Кликай за стену.", { fontSize: '18px', fill: '#0f0' });
 
-            // --- ФУНКЦИЯ ШАГОВ ---
-            // Она берет маршрут от ИИ и двигает героя по одной клетке за раз
             function moveCharacter(path, index) {
                 if (index >= path.length) {
-                    isMoving = false; // Дошли до конца!
+                    isMoving = false; 
                     return;
                 }
 
                 let nextTile = path[index];
                 
-                // Запоминаем новую позицию героя в матрице
                 heroGridX = nextTile.x;
                 heroGridY = nextTile.y;
 
-                // Вычисляем экранные координаты этой клетки
                 let nextIsoX = startX + (nextTile.x - nextTile.y) * tileWidth;
                 let nextIsoY = startY + (nextTile.x + nextTile.y) * tileHeight;
 
-                hero.flipX = (nextIsoX < hero.x); // Разворот
+                hero.flipX = (nextIsoX < hero.x); 
 
-                // Делаем один плавный шаг и рекурсивно вызываем следующий
                 scene.tweens.add({
                     targets: hero,
                     x: nextIsoX,
                     y: nextIsoY,
-                    duration: 300, // Скорость одного шага
+                    duration: 300, 
                     ease: 'Linear',
-                    onComplete: () => moveCharacter(path, index + 1) // Как закончил шаг - делай следующий
+                    onComplete: () => moveCharacter(path, index + 1) 
                 });
             }
         }
