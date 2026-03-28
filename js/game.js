@@ -1,16 +1,12 @@
 // 1. В САМОЕ НАЧАЛО: Адрес твоего сервера
-const BACKEND_URL = "simsai-2026-production.up.railway.app"; 
+const BACKEND_URL = "https://simsai-2026-production.up.railway.app"; 
 
 // 2. ФУНКЦИЯ ЗАГРУЗКИ: Спрашиваем сервер о стенах
-async function loadWallsFromServer() {
+async function loadDataFromServer() {
     try {
-        const response = await fetch(`${BACKEND_URL}/get_map`);
-        const data = await response.json();
-        return data.walls; // Возвращает список координат [[r,c], [r,c]]
-    } catch (e) {
-        console.error("Сервер молчит, Нурик живет в памяти браузера");
-        return [];
-    }
+        const response = await fetch(`https://${BACKEND_URL}/get_map`);
+        return await response.json();
+    } catch (e) { return null; }
 }
 
 const config = {
@@ -22,7 +18,8 @@ const config = {
 
 const game = new Phaser.Game(config);
 let levelMap = Array(8).fill().map(() => Array(8).fill(0));
-levelMap[7][0] = 2; // Кровать Нурика
+levelMap[7][0] = 2;
+levelMap[0][7] = 3;// Кровать Нурика
 
 function preload() {
     this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
@@ -35,8 +32,12 @@ async function create() {
     const sX = window.innerWidth / 2, sY = 150, tW = 32, tH = 16;
 
     // 4. ЗАГРУЗКА ДАННЫХ: Ждем ответа от сервера перед отрисовкой
-    const savedWalls = await loadWallsFromServer();
-    savedWalls.forEach(w => {
+    const data = await loadDataFromServer();
+if (data) {
+    data.walls.forEach(w => { levelMap[w[0]][w[1]] = 1; });
+    energy = data.energy;
+    hunger = data.hunger;
+}
         levelMap[w[0]][w[1]] = 1; // Помечаем стены из базы на карте
     });
 
@@ -94,9 +95,14 @@ async function create() {
     updateEnergyUI();
 
     setInterval(() => {
-        if (!movingTo && energy < 100) { energy = Math.min(100, energy + 1); updateEnergyUI(); }
-    }, 1000);
-}
+    if (!movingTo) {
+        // Когда стоит, энергия чуть-чуть растет
+        if (energy < 100) energy = Math.min(100, energy + 1);
+        // А голод потихоньку падает всегда!
+        if (hunger > 0) hunger -= 1;
+        updateUI(); 
+    }
+}, 3000); // Раз в 3 секунды
 
 function update() {
     if (hero && heroLabel) {
