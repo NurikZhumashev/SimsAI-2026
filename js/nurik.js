@@ -1,4 +1,4 @@
-const BACKEND_URL = "https://simsai-2026-production.up.railway.app";
+window.BACKEND_URL = "https://simsai-2026-production.up.railway.app";
 // Полное состояние Нурика
 let stars = 50;
 let energy = 100;
