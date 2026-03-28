@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Fixed Logic</title>
+    <title>Sims AI - Нурик</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style>
         body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
@@ -27,15 +27,12 @@
 
         const config = {
             type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight,
-            scene: { preload: preload, create: create }
+            scene: { preload: preload, create: create, update: update }
         };
 
         const game = new Phaser.Game(config);
-        let hero, currentTween, sceneRef;
-        let curGrid = { x: 0, y: 0 };    
-        let movingTo = null;            
-        let futurePath = [];            
-        
+        let hero, heroLabel, sceneRef;
+        let curGrid = { x: 0, y: 0 }, movingTo = null, futurePath = [];
         const levelMap = Array(8).fill().map(() => Array(8).fill(0));
 
         function preload() {
@@ -60,12 +57,10 @@
                             tile.y += isWall ? -4 : 4;
                         } else {
                             if (levelMap[r][c] === 1) return;
-
-                            let startPoint = movingTo ? movingTo : curGrid;
-                            let newPath = findPath(startPoint.x, startPoint.y, c, r);
-                            
-                            if (newPath && newPath.length > 1) {
-                                futurePath = newPath.slice(1);
+                            let start = movingTo ? movingTo : curGrid;
+                            let path = findPath(start.x, start.y, c, r);
+                            if (path && path.length > 1) {
+                                futurePath = path.slice(1);
                                 if (!movingTo) walk(sX, sY, tW, tH);
                             }
                         }
@@ -73,34 +68,39 @@
                     tile.on('pointerover',()=>tile.setTint(0x00ff00)).on('pointerout',()=>{tile.setTint(levelMap[r][c]===1?0x333333:0xffffff)});
                 }
             }
+
+            // Создаем Нурика
             hero = this.add.sprite(sX, sY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
+            
+            // Создаем Имя (привяжем его координаты в update)
+            heroLabel = this.add.text(sX, sY - 45, 'Нурик', { 
+                fontSize: '14px', 
+                fill: '#ffffff', 
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                padding: { x: 4, y: 2 }
+            }).setOrigin(0.5);
+        }
+
+        // Кадровая синхронизация имени и героя
+        function update() {
+            if (hero && heroLabel) {
+                heroLabel.x = hero.x;
+                heroLabel.y = hero.y - 45;
+            }
         }
 
         function walk(sX, sY, tW, tH) {
-            if (futurePath.length === 0) {
-                movingTo = null;
-                return;
-            }
-
-            movingTo = futurePath.shift(); 
-            
-            if (levelMap[movingTo.y][movingTo.x] === 1) {
-                movingTo = null; futurePath = []; return;
-            }
+            if (futurePath.length === 0) { movingTo = null; return; }
+            movingTo = futurePath.shift();
+            if (levelMap[movingTo.y][movingTo.x] === 1) { movingTo = null; futurePath = []; return; }
 
             let d = Math.sqrt(Math.pow(movingTo.x - curGrid.x, 2) + Math.pow(movingTo.y - curGrid.y, 2));
-            let targetX = sX + (movingTo.x - movingTo.y) * tW;
-            let targetY = sY + (movingTo.x + movingTo.y) * tH;
+            let tX = sX + (movingTo.x - movingTo.y) * tW, tY = sY + (movingTo.x + movingTo.y) * tH;
+            hero.flipX = (tX < hero.x);
 
-            hero.flipX = (targetX < hero.x);
-
-            currentTween = sceneRef.tweens.add({
-                targets: hero, x: targetX, y: targetY,
-                duration: 250 * d,
-                onComplete: () => {
-                    curGrid = { x: movingTo.x, y: movingTo.y };
-                    walk(sX, sY, tW, tH);
-                }
+            sceneRef.tweens.add({
+                targets: hero, x: tX, y: tY, duration: 250 * d,
+                onComplete: () => { curGrid = { x: movingTo.x, y: movingTo.y }; walk(sX, sY, tW, tH); }
             });
         }
 
@@ -113,14 +113,10 @@
                 for (let d of dirs) {
                     let nx = curr.x + d.x, ny = curr.y + d.y;
                     if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx]===0) {
-                        // Проверка углов стен при движении по диагонали
                         if (Math.abs(d.x) === 1 && Math.abs(d.y) === 1) {
                             if (levelMap[curr.y][nx] === 1 || levelMap[ny][curr.x] === 1) continue;
                         }
-                        if (!v.has(nx + "," + ny)) {
-                            v.add(nx + "," + ny);
-                            q.push([...p, {x: nx, y: ny}]);
-                        }
+                        if (!v.has(nx + "," + ny)) { v.add(nx + "," + ny); q.push([...p, {x: nx, y: ny}]); }
                     }
                 }
             }
