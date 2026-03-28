@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Fix Movement</title>
+    <title>Sims AI - Smooth Pivot</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style> body { margin: 0; background: #111; overflow: hidden; } </style>
 </head>
@@ -17,6 +17,7 @@
         let hero, currentTween, sceneRef;
         let curGrid = { x: 0, y: 0 };
         let activePath = [];
+        let nextTarget = null; // Точка, в которую мы СЕЙЧАС шагаем
 
         const levelMap = [
             [0,0,0,0,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,0,0,0,0,0,0],
@@ -40,52 +41,54 @@
                     if (levelMap[r][c] === 1) { tile.setTint(0x333333); tile.y -= 4; }
                     else {
                         tile.setInteractive().on('pointerdown', () => {
-                            // ОСТАНОВКА И ПРИВЯЗКА (Снаппинг)
-                            if (currentTween) currentTween.stop();
+                            // Если мы уже идем, то новый путь строим от клетки, 
+                            // В КОТОРУЮ мы сейчас наступаем, а не от той, которую покинули.
+                            let startFrom = nextTarget ? nextTarget : curGrid;
                             
-                            // Мгновенно ставим героя в центр клетки, где он был "логически"
-                            hero.x = startX + (curGrid.x - curGrid.y) * tW;
-                            hero.y = startY + (curGrid.x + curGrid.y) * tH;
-
-                            // Если кликнули в ту же клетку - просто стоим
-                            if (curGrid.x === c && curGrid.y === r) {
-                                activePath = [];
-                                return;
-                            }
-
-                            let newPath = findPath(curGrid.x, curGrid.y, c, r);
-                            if (newPath && newPath.length > 1) {
+                            let newPath = findPath(startFrom.x, startFrom.y, c, r);
+                            
+                            if (newPath) {
                                 activePath = newPath;
-                                walk(1, startX, startY, tW, tH);
+                                // Если мы стояли на месте, запускаем движение
+                                if (!currentTween || !currentTween.isPlaying()) {
+                                    walk(0, startX, startY, tW, tH);
+                                }
                             }
                         });
                         tile.on('pointerover', () => tile.setTint(0x00ff00)).on('pointerout', () => tile.clearTint());
                     }
                 }
             }
-
             hero = this.add.sprite(startX, startY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
         }
 
         function walk(index, sX, sY, tW, tH) {
-            if (index >= activePath.length) return;
+            if (index >= activePath.length) {
+                nextTarget = null;
+                return;
+            }
 
-            let next = activePath[index];
-            let dist = Math.sqrt(Math.pow(next.x - curGrid.x, 2) + Math.pow(next.y - curGrid.y, 2));
+            nextTarget = activePath[index];
+            
+            // Если мы уже в этой клетке (нажали на ту же самую), идем к следующей
+            if (nextTarget.x === curGrid.x && nextTarget.y === curGrid.y) {
+                walk(index + 1, sX, sY, tW, tH);
+                return;
+            }
 
-            // Обновляем логическую позицию СРАЗУ
-            curGrid.x = next.x; 
-            curGrid.y = next.y;
-
-            let targetX = sX + (curGrid.x - curGrid.y) * tW;
-            let targetY = sY + (curGrid.x + curGrid.y) * tH;
+            let dist = Math.sqrt(Math.pow(nextTarget.x - curGrid.x, 2) + Math.pow(nextTarget.y - curGrid.y, 2));
+            let targetX = sX + (nextTarget.x - nextTarget.y) * tW;
+            let targetY = sY + (nextTarget.x + nextTarget.y) * tH;
 
             hero.flipX = (targetX < hero.x);
 
             currentTween = sceneRef.tweens.add({
                 targets: hero, x: targetX, y: targetY,
                 duration: 250 * dist,
-                onComplete: () => walk(index + 1, sX, sY, tW, tH)
+                onComplete: () => {
+                    curGrid = { x: nextTarget.x, y: nextTarget.y };
+                    walk(index + 1, sX, sY, tW, tH);
+                }
             });
         }
 
