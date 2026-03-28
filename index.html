@@ -2,19 +2,18 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Состояние Нурика</title>
+    <title>Sims AI - Дом Нурика</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style>
         body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
         #ui { position: absolute; top: 10px; left: 10px; z-index: 100; display: flex; gap: 10px; }
-        button { padding: 8px 15px; cursor: pointer; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; transition: 0.2s; }
+        button { padding: 8px 15px; cursor: pointer; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
         button.active { background: #28a745; border-color: #fff; font-weight: bold; }
         
-        /* Индикатор энергии в углу */
-        #status-panel { position: absolute; top: 10px; right: 10px; z-index: 100; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; border: 1px solid #444; width: 150px; }
-        .stat-label { color: #aaa; fontSize: 12px; margin-bottom: 5px; display: block; }
-        .bar-bg { width: 100%; height: 10px; background: #222; border-radius: 5px; overflow: hidden; }
-        #energy-bar { width: 100%; height: 100%; background: #28a745; transition: width 0.3s, background 0.3s; }
+        #status-panel { position: absolute; top: 10px; right: 10px; z-index: 100; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; border: 1px solid #444; width: 150px; }
+        .stat-label { color: #aaa; font-size: 11px; margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: 1px; }
+        .bar-bg { width: 100%; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
+        #energy-bar { width: 100%; height: 100%; background: #28a745; transition: width 0.3s; }
     </style>
 </head>
 <body>
@@ -24,10 +23,8 @@
     </div>
 
     <div id="status-panel">
-        <span class="stat-label">ЭНЕРГИЯ НУРИКА</span>
-        <div class="bar-bg">
-            <div id="energy-bar"></div>
-        </div>
+        <span class="stat-label">Энергия Нурика</span>
+        <div class="bar-bg"><div id="energy-bar"></div></div>
     </div>
 
     <script>
@@ -40,9 +37,9 @@
             document.getElementById('bBtn').className = m ? 'active' : '';
         }
 
-        // Обновление полоски в интерфейсе
         function updateEnergyUI() {
             const bar = document.getElementById('energy-bar');
+            if (!bar) return;
             bar.style.width = energy + '%';
             if (energy > 50) bar.style.background = '#28a745';
             else if (energy > 20) bar.style.background = '#ffc107';
@@ -57,7 +54,10 @@
         const game = new Phaser.Game(config);
         let hero, heroLabel, sceneRef;
         let curGrid = { x: 0, y: 0 }, movingTo = null, futurePath = [];
+        
+        // 0 - пол, 1 - стена, 2 - кровать
         const levelMap = Array(8).fill().map(() => Array(8).fill(0));
+        levelMap[7][0] = 2; // Ставим кровать в угол
 
         function preload() {
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
@@ -72,22 +72,23 @@
                 for (let c = 0; c < 8; c++) {
                     let iX = sX + (c - r) * tW, iY = sY + (c + r) * tH;
                     let tile = this.add.image(iX, iY, 'tile');
+                    
+                    // Визуализация типов клеток
+                    if (levelMap[r][c] === 1) { 
+                        tile.setTint(0x333333); tile.y -= 4; 
+                    } else if (levelMap[r][c] === 2) {
+                        tile.setTint(0x0000ff); // Кровать синяя
+                    }
+
                     tile.setInteractive().on('pointerdown', () => {
                         if (isBuild) {
-                            if (c === curGrid.x && r === curGrid.y) return;
+                            if ((c === curGrid.x && r === curGrid.y) || levelMap[r][c] === 2) return;
                             let isWall = levelMap[r][c] === 0;
                             levelMap[r][c] = isWall ? 1 : 0;
                             tile.setTint(isWall ? 0x333333 : 0xffffff);
                             tile.y += isWall ? -4 : 4;
                         } else {
-                            if (levelMap[r][c] === 1) return;
-                            
-                            // ПРОВЕРКА ЭНЕРГИИ
-                            if (energy <= 0) {
-                                console.log("Нурику нужен отдых!");
-                                return;
-                            }
-
+                            if (levelMap[r][c] === 1 || energy < 5) return;
                             let start = movingTo ? movingTo : curGrid;
                             let path = findPath(start.x, start.y, c, r);
                             if (path && path.length > 1) {
@@ -96,7 +97,13 @@
                             }
                         }
                     });
-                    tile.on('pointerover',()=>tile.setTint(0x00ff00)).on('pointerout',()=>{tile.setTint(levelMap[r][c]===1?0x333333:0xffffff)});
+                    
+                    tile.on('pointerover',() => tile.setTint(0x00ff00));
+                    tile.on('pointerout',() => {
+                        if (levelMap[r][c] === 1) tile.setTint(0x333333);
+                        else if (levelMap[r][c] === 2) tile.setTint(0x0000ff);
+                        else tile.clearTint();
+                    });
                 }
             }
 
@@ -106,6 +113,14 @@
             }).setOrigin(0.5);
             
             updateEnergyUI();
+
+            // Пассивное восстановление
+            setInterval(() => {
+                if (!movingTo && energy < 100) {
+                    energy = Math.min(100, energy + 1);
+                    updateEnergyUI();
+                }
+            }, 1000);
         }
 
         function update() {
@@ -122,21 +137,32 @@
             }
 
             movingTo = futurePath.shift();
-            if (levelMap[movingTo.y][movingTo.x] === 1) { movingTo = null; futurePath = []; return; }
+            
+            if (levelMap[movingTo.y][movingTo.x] === 1) {
+                movingTo = null; futurePath = []; return;
+            }
 
-            // ТРАТИМ ЭНЕРГИЮ ЗА ШАГ
-            energy -= 2;
-            if (energy < 0) energy = 0;
+            energy -= 2; 
             updateEnergyUI();
 
             let d = Math.sqrt(Math.pow(movingTo.x - curGrid.x, 2) + Math.pow(movingTo.y - curGrid.y, 2));
-            let tX = sX + (movingTo.x - movingTo.y) * tW, tY = sY + (movingTo.x + movingTo.y) * tH;
-            hero.flipX = (targetX < hero.x); // Тут была опечатка tX
+            let tX = sX + (movingTo.x - movingTo.y) * tW;
+            let tY = sY + (movingTo.x + movingTo.y) * tH;
+
+            hero.flipX = (tX < hero.x);
 
             sceneRef.tweens.add({
                 targets: hero, x: tX, y: tY, duration: 250 * d,
                 onComplete: () => { 
                     curGrid = { x: movingTo.x, y: movingTo.y }; 
+                    
+                    // ПРОВЕРКА КРОВАТИ: Если Нурик пришел на синий блок
+                    if (levelMap[curGrid.y][curGrid.x] === 2) {
+                        energy = 100;
+                        updateEnergyUI();
+                        console.log("Нурик выспался!");
+                    }
+                    
                     walk(sX, sY, tW, tH); 
                 }
             });
@@ -150,7 +176,7 @@
                 let dirs = [{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0},{x:1,y:1},{x:1,y:-1},{x:-1,y:1},{x:-1,y:-1}];
                 for (let d of dirs) {
                     let nx = curr.x + d.x, ny = curr.y + d.y;
-                    if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx]===0) {
+                    if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx] !== 1) {
                         if (Math.abs(d.x) === 1 && Math.abs(d.y) === 1) {
                             if (levelMap[curr.y][nx] === 1 || levelMap[ny][curr.x] === 1) continue;
                         }
