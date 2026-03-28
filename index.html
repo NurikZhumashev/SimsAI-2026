@@ -2,8 +2,9 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Умная Карта</title>
+    <title>Sims AI - Умный Поиск Пути (A*)</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/easystarjs@0.4.4/build/easystar-0.4.4.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
 <body>
@@ -18,7 +19,10 @@
         const game = new Phaser.Game(config);
         
         let hero;
-        let moveTween = null;
+        // Запоминаем, на какой клетке стоит герой
+        let heroGridX = 0; 
+        let heroGridY = 0;
+        let isMoving = false;
 
         function preload() {
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
@@ -31,9 +35,6 @@
             const tileWidth = 32;  
             const tileHeight = 16; 
 
-            // 🧠 НАША ПЕРВАЯ АРХИТЕКТУРА ДАННЫХ
-            // 0 - свободный пол
-            // 1 - стена / препятствие
             const levelMap = [
                 [0, 0, 0, 0, 0, 0, 0, 0],
                 [0, 0, 1, 1, 0, 0, 0, 0],
@@ -45,52 +46,87 @@
                 [0, 0, 0, 0, 0, 0, 0, 0]
             ];
 
+            // --- НАСТРАИВАЕМ ИИ (EasyStar) ---
+            let easystar = new EasyStar.js();
+            easystar.setGrid(levelMap);          // Отдаем ИИ нашу карту
+            easystar.setAcceptableTiles([0]);    // Говорим, что ходить можно только по нулям (0)
+            easystar.enableDiagonals();          // Разрешаем ходить по диагонали
+
+            let scene = this; // Сохраняем ссылку на сцену для анимаций
+
+            // Строим пол
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
                     let isoX = startX + (x - y) * tileWidth;
                     let isoY = startY + (x + y) * tileHeight;
 
-                    // Читаем данные из нашей карты
                     let tileType = levelMap[y][x];
                     let tile = this.add.image(isoX, isoY, 'tile');
 
                     if (tileType === 1) {
-                        // ЭТО ПРЕПЯТСТВИЕ
-                        tile.setTint(0x555555); // Красим в темно-серый "бетон"
-                        tile.y -= 8; // Слегка приподнимаем для эффекта объема
+                        tile.setTint(0x555555); 
+                        tile.y -= 8; 
                     } else {
-                        // ЭТО СВОБОДНЫЙ ПОЛ
                         tile.setInteractive();
-
                         tile.on('pointerover', () => tile.setTint(0x00ff00));
                         tile.on('pointerout', () => tile.clearTint());
                         
+                        // КЛИК ПО ПОЛУ
                         tile.on('pointerdown', () => {
+                            if (isMoving) return; // Блокируем новые клики, пока он идет
+                            
                             tile.setTint(0xff0000); 
-                            hero.flipX = (isoX < hero.x);
 
-                            let distance = Phaser.Math.Distance.Between(hero.x, hero.y, isoX, isoY);
-                            let duration = (distance / 200) * 1000;
-
-                            if (moveTween) moveTween.stop();
-
-                            moveTween = this.tweens.add({
-                                targets: hero,
-                                x: isoX,
-                                y: isoY,
-                                duration: duration,
-                                ease: 'Linear'
+                            // Просим ИИ найти путь от героя до точки клика
+                            easystar.findPath(heroGridX, heroGridY, x, y, function(path) {
+                                if (path === null) {
+                                    console.log("Путь заблокирован!");
+                                } else {
+                                    isMoving = true;
+                                    moveCharacter(path, 0); // Запускаем шаги
+                                }
                             });
+                            easystar.calculate(); // Команда ИИ "Думай!"
                         });
                     }
                 }
             }
 
-            // Ставим героя на стартовую позицию (клетка 0:0)
             hero = this.add.sprite(startX, startY, 'hero');
             hero.setScale(1.5);
             
-            this.add.text(20, 20, "Карта загружена. Серые блоки - препятствия.", { fontSize: '18px', fill: '#0f0' });
+            this.add.text(20, 20, "A* Pathfinding работает! Кликай за стену.", { fontSize: '18px', fill: '#0f0' });
+
+            // --- ФУНКЦИЯ ШАГОВ ---
+            // Она берет маршрут от ИИ и двигает героя по одной клетке за раз
+            function moveCharacter(path, index) {
+                if (index >= path.length) {
+                    isMoving = false; // Дошли до конца!
+                    return;
+                }
+
+                let nextTile = path[index];
+                
+                // Запоминаем новую позицию героя в матрице
+                heroGridX = nextTile.x;
+                heroGridY = nextTile.y;
+
+                // Вычисляем экранные координаты этой клетки
+                let nextIsoX = startX + (nextTile.x - nextTile.y) * tileWidth;
+                let nextIsoY = startY + (nextTile.x + nextTile.y) * tileHeight;
+
+                hero.flipX = (nextIsoX < hero.x); // Разворот
+
+                // Делаем один плавный шаг и рекурсивно вызываем следующий
+                scene.tweens.add({
+                    targets: hero,
+                    x: nextIsoX,
+                    y: nextIsoY,
+                    duration: 300, // Скорость одного шага
+                    ease: 'Linear',
+                    onComplete: () => moveCharacter(path, index + 1) // Как закончил шаг - делай следующий
+                });
+            }
         }
     </script>
 </body>
