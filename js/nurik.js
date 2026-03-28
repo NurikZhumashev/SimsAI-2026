@@ -1,3 +1,6 @@
+// ПЕРЕНЕСЛИ СЮДА, чтобы этот файл знал, куда обращаться
+const BACKEND_URL = "https://simsai-2026-production.up.railway.app"; 
+
 let energy = 100;
 let hunger = 100;
 let curGrid = { x: 0, y: 0 };
@@ -31,9 +34,9 @@ async function walk(sX, sY, tW, tH, scene) {
             
             if (levelMap[curGrid.y][curGrid.x] === 2) { energy = 100; }
             
-            // ЕДА: Убрал лишнее https://
             if (levelMap[curGrid.y][curGrid.x] === 3) {
                 hunger = 100;
+                // ИСПРАВЛЕНО: убрано лишнее https://
                 await fetch(`${BACKEND_URL}/eat`, { method: 'POST' });
             }
             
