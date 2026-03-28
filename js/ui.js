@@ -6,13 +6,19 @@ function setMode(m) {
     document.getElementById('bBtn').className = m ? 'active' : '';
 }
 
-function updateEnergyUI() {
-    const bar = document.getElementById('energy-bar');
-    if (!bar) return;
-    bar.style.width = energy + '%';
-    if (energy > 50) bar.style.background = '#28a745';
-    else if (energy > 20) bar.style.background = '#ffc107';
-    else bar.style.background = '#dc3545';
+function updateUI() {
+    const eBar = document.getElementById('energy-bar');
+    if (eBar) {
+        eBar.style.width = energy + '%';
+        eBar.style.background = energy > 20 ? '#28a745' : '#dc3545';
+    }
+
+    const hBar = document.getElementById('hunger-bar');
+    if (hBar) {
+        hBar.style.width = hunger + '%';
+        // Если голод меньше 30% — полоска станет оранжевой
+        hBar.style.background = hunger > 30 ? '#00bcd4' : '#ff5722';
+    }
 }
 
 // Привязываем клики к кнопкам (поскольку они в HTML)
