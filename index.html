@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Режим Бога</title>
+    <title>Sims AI - Плавная Изометрия</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style> body { margin: 0; background: #111; overflow: hidden; } </style>
 </head>
@@ -15,11 +15,8 @@
 
         const game = new Phaser.Game(config);
         let hero, isMoving = false;
-        
-        // ТЕКУЩАЯ ПОЗИЦИЯ ГЕРОЯ (В КЛЕТКАХ)
         let curGrid = { x: 0, y: 0 };
 
-        // КАРТА: 1 - НЕПРОХОДИМО, 0 - ПОЛ
         const levelMap = [
             [0,0,0,0,0,0,0,0],
             [0,0,1,1,0,0,0,0],
@@ -40,45 +37,36 @@
             const startX = window.innerWidth / 2, startY = 150, tW = 32, tH = 16;
             let scene = this;
 
-            // РИСУЕМ СЕТКУ
-            for (let r = 0; r < 8; r++) { // r = row (Y)
-                for (let c = 0; c < 8; c++) { // c = col (X)
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
                     let iX = startX + (c - r) * tW;
                     let iY = startY + (c + r) * tH;
                     let tile = this.add.image(iX, iY, 'tile');
 
                     if (levelMap[r][c] === 1) {
-                        tile.setTint(0x333333); // Стена - темная
+                        tile.setTint(0x333333);
                         tile.y -= 4;
                     } else {
                         tile.setInteractive().on('pointerdown', () => {
                             if (isMoving) return;
-                            
-                            // ИЩЕМ ПУТЬ
                             let path = findPath(curGrid.x, curGrid.y, c, r);
                             if (path && path.length > 1) {
                                 isMoving = true;
                                 walkAlongPath(scene, path, 1, startX, startY, tW, tH);
                             }
                         });
-                        tile.on('pointerover', () => tile.setTint(0x00ff00))
-                            .on('pointerout', () => tile.clearTint());
+                        tile.on('pointerover', () => tile.setTint(0x00ff00)).on('pointerout', () => tile.clearTint());
                     }
                 }
             }
 
-            // ПЕРСОНАЖ
             hero = this.add.sprite(startX, startY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
 
             function walkAlongPath(scene, path, index, sX, sY, tW, tH) {
-                if (index >= path.length) {
-                    isMoving = false;
-                    return;
-                }
+                if (index >= path.length) { isMoving = false; return; }
 
                 let next = path[index];
-                curGrid.x = next.x;
-                curGrid.y = next.y;
+                curGrid.x = next.x; curGrid.y = next.y;
 
                 let targetX = sX + (curGrid.x - curGrid.y) * tW;
                 let targetY = sY + (curGrid.x + curGrid.y) * tH;
@@ -86,16 +74,14 @@
                 hero.flipX = (targetX < hero.x);
 
                 scene.tweens.add({
-                    targets: hero,
-                    x: targetX,
-                    y: targetY,
-                    duration: 250,
+                    targets: hero, x: targetX, y: targetY,
+                    duration: 300,
                     onComplete: () => walkAlongPath(scene, path, index + 1, sX, sY, tW, tH)
                 });
             }
         }
 
-        // --- УЛЬТРА-СТРОГИЙ ПОИСК ПУТИ (BFS) ---
+        // --- УМНЫЙ ПОИСК ПУТИ (8 НАПРАВЛЕНИЙ + ЗАЩИТА УГЛОВ) ---
         function findPath(sx, sy, ex, ey) {
             let queue = [[{x: sx, y: sy}]];
             let visited = new Set();
@@ -107,26 +93,35 @@
 
                 if (last.x === ex && last.y === ey) return path;
 
-                // Только 4 направления (вверх, вниз, влево, вправо)
-                // Это ГАРАНТИРУЕТ, что он не пройдет сквозь углы блоков
+                // 8 направлений: прямые + диагонали
                 let neighbors = [
-                    {x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 0}, {x: -1, y: 0}
+                    {x: 0, y: 1}, {x: 0, y: -1}, {x: 1, y: 0}, {x: -1, y: 0},
+                    {x: 1, y: 1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: -1, y: -1}
                 ];
 
                 for (let d of neighbors) {
                     let nx = last.x + d.x;
                     let ny = last.y + d.y;
 
-                    // Проверка границ и проходимости (levelMap[Y][X])
-                    if (ny >= 0 && ny < 8 && nx >= 0 && nx < 8) {
-                        if (levelMap[ny][nx] === 0 && !visited.has(nx + "," + ny)) {
+                    if (ny >= 0 && ny < 8 && nx >= 0 && nx < 8 && levelMap[ny][nx] === 0) {
+                        
+                        // МАГИЯ: Проверка срезания углов
+                        // Если мы идем по диагонали (dx и dy не 0), 
+                        // проверяем, свободны ли клетки по бокам от этого шага.
+                        if (Math.abs(d.x) === 1 && Math.abs(d.y) === 1) {
+                            if (levelMap[last.y][nx] === 1 || levelMap[ny][last.x] === 1) {
+                                continue; // Угол занят стеной, проход запрещен
+                            }
+                        }
+
+                        if (!visited.has(nx + "," + ny)) {
                             visited.add(nx + "," + ny);
                             queue.push([...path, {x: nx, y: ny}]);
                         }
                     }
                 }
             }
-            return null; // Пути нет
+            return null;
         }
     </script>
 </body>
