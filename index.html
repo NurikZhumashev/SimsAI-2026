@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Точное Управление</title>
+    <title>Sims AI - Плавный Интеллект</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style>
         body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
@@ -31,7 +31,11 @@
         };
 
         const game = new Phaser.Game(config);
-        let hero, currentTween, sceneRef, curGrid = { x: 0, y: 0 }, activePath = [];
+        let hero, currentTween, sceneRef;
+        let curGrid = { x: 0, y: 0 };    // Где мы сейчас ЛОГИЧЕСКИ
+        let movingTo = null;            // Клетка, в которую мы СЕЙЧАС шагаем
+        let futurePath = [];            // Очередь шагов на будущее
+        
         const levelMap = Array(8).fill().map(() => Array(8).fill(0));
 
         function preload() {
@@ -56,17 +60,15 @@
                             tile.y += isWall ? -4 : 4;
                         } else {
                             if (levelMap[r][c] === 1) return;
-                            
-                            // 1. ОСТАНАВЛИВАЕМ ГЕРОЯ МГНОВЕННО
-                            if (currentTween) currentTween.stop();
 
-                            // 2. ИЩЕМ НОВЫЙ ПУТЬ
-                            // Считаем путь от клетки, в которой он ЗАКОНЧИЛ движение (или на которой стоит)
-                            let path = findPath(curGrid.x, curGrid.y, c, r);
+                            // СТРАТЕГИЯ: Считаем путь от финальной точки текущего шага
+                            let startPoint = movingTo ? movingTo : curGrid;
+                            let newPath = findPath(startPoint.x, startPoint.y, c, r);
                             
-                            if (path && path.length > 1) {
-                                activePath = path;
-                                walk(1, sX, sY, tW, tH); // Начинаем с первого шага нового пути
+                            if (newPath && newPath.length > 1) {
+                                futurePath = newPath.slice(1); // Отсекаем текущую клетку
+                                // Если стоим — начинаем идти
+                                if (!movingTo) walk(sX, sY, tW, tH);
                             }
                         }
                     });
@@ -76,19 +78,22 @@
             hero = this.add.sprite(sX, sY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
         }
 
-        function walk(idx, sX, sY, tW, tH) {
-            if (idx >= activePath.length) return;
+        function walk(sX, sY, tW, tH) {
+            if (futurePath.length === 0) {
+                movingTo = null;
+                return;
+            }
 
-            let next = activePath[idx];
+            movingTo = futurePath.shift(); // Берем следующий шаг из очереди
             
-            // Если на пути внезапно выросла стена (режим стройки)
-            if (levelMap[next.y][next.x] === 1) { activePath = []; return; }
+            // Проверка на внезапную стену
+            if (levelMap[movingTo.y][movingTo.x] === 1) {
+                movingTo = null; futurePath = []; return;
+            }
 
-            // Вычисляем расстояние для корректной скорости (диагонали медленнее)
-            let d = Math.sqrt(Math.pow(next.x - curGrid.x, 2) + Math.pow(next.y - curGrid.y, 2));
-
-            let targetX = sX + (next.x - next.y) * tW;
-            let targetY = sY + (next.y + next.x) * tH;
+            let d = Math.sqrt(Math.pow(movingTo.x - curGrid.x, 2) + Math.pow(movingTo.y - curGrid.y, 2));
+            let targetX = sX + (movingTo.x - movingTo.y) * tW;
+            let targetY = sY + (movingTo.x + movingTo.y) * tH;
 
             hero.flipX = (targetX < hero.x);
 
@@ -98,8 +103,8 @@
                 y: targetY,
                 duration: 250 * d,
                 onComplete: () => {
-                    curGrid = { x: next.x, y: next.y };
-                    walk(idx + 1, sX, sY, tW, tH);
+                    curGrid = { x: movingTo.x, y: movingTo.y };
+                    walk(sX, sY, tW, tH);
                 }
             });
         }
@@ -113,8 +118,13 @@
                 for (let d of dirs) {
                     let nx = l.x + d.x, ny = l.y + d.y;
                     if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx]===0) {
-                        // Защита от прохождения сквозь углы
-                        if (Math.abs(d.x)===1 && Math.abs(d.y)===1 && (levelMap[l.y][nx]===1 || levelMap[ny][l.x]===1)) continue;
+                        if (Math.abs(d.x)===1 && Math.abs(d.y)===1 && (levelMap[l.y][nx]===1 || levelMap[ny][last.x]===1)) continue; // Заглушка, исправлено ниже
+                        
+                        // Строгая проверка диагоналей
+                        if (Math.abs(d.x)===1 && Math.abs(d.y)===1) {
+                            if (levelMap[l.y][nx] === 1 || levelMap[ny][l.x] === 1) continue;
+                        }
+
                         if (!v.has(nx + "," + ny)) { v.add(nx + "," + ny); q.push([...p, {x: nx, y: ny}]); }
                     }
                 }
