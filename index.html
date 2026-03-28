@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Редактор</title>
+    <title>Sims AI - Точное Управление</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style>
         body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
@@ -31,7 +31,7 @@
         };
 
         const game = new Phaser.Game(config);
-        let hero, currentTween, sceneRef, curGrid = { x: 0, y: 0 }, activePath = [], nextTarget = null;
+        let hero, currentTween, sceneRef, curGrid = { x: 0, y: 0 }, activePath = [];
         const levelMap = Array(8).fill().map(() => Array(8).fill(0));
 
         function preload() {
@@ -56,9 +56,18 @@
                             tile.y += isWall ? -4 : 4;
                         } else {
                             if (levelMap[r][c] === 1) return;
-                            let start = nextTarget || curGrid;
-                            let path = findPath(start.x, start.y, c, r);
-                            if (path) { activePath = path; if (!currentTween || !currentTween.isPlaying()) walk(0, sX, sY, tW, tH); }
+                            
+                            // 1. ОСТАНАВЛИВАЕМ ГЕРОЯ МГНОВЕННО
+                            if (currentTween) currentTween.stop();
+
+                            // 2. ИЩЕМ НОВЫЙ ПУТЬ
+                            // Считаем путь от клетки, в которой он ЗАКОНЧИЛ движение (или на которой стоит)
+                            let path = findPath(curGrid.x, curGrid.y, c, r);
+                            
+                            if (path && path.length > 1) {
+                                activePath = path;
+                                walk(1, sX, sY, tW, tH); // Начинаем с первого шага нового пути
+                            }
                         }
                     });
                     tile.on('pointerover',()=>tile.setTint(0x00ff00)).on('pointerout',()=>{tile.setTint(levelMap[r][c]===1?0x333333:0xffffff)});
@@ -68,16 +77,30 @@
         }
 
         function walk(idx, sX, sY, tW, tH) {
-            if (idx >= activePath.length) { nextTarget = null; return; }
-            nextTarget = activePath[idx];
-            if (nextTarget.x === curGrid.x && nextTarget.y === curGrid.y) return walk(idx + 1, sX, sY, tW, tH);
-            if (levelMap[nextTarget.y][nextTarget.x] === 1) { nextTarget = null; activePath = []; return; }
-            let d = Math.sqrt(Math.pow(nextTarget.x-curGrid.x,2)+Math.pow(nextTarget.y-curGrid.y,2));
-            let tX = sX + (nextTarget.x - nextTarget.y) * tW, tY = sY + (nextTarget.x + nextTarget.y) * tH;
-            hero.flipX = (tX < hero.x);
+            if (idx >= activePath.length) return;
+
+            let next = activePath[idx];
+            
+            // Если на пути внезапно выросла стена (режим стройки)
+            if (levelMap[next.y][next.x] === 1) { activePath = []; return; }
+
+            // Вычисляем расстояние для корректной скорости (диагонали медленнее)
+            let d = Math.sqrt(Math.pow(next.x - curGrid.x, 2) + Math.pow(next.y - curGrid.y, 2));
+
+            let targetX = sX + (next.x - next.y) * tW;
+            let targetY = sY + (next.y + next.x) * tH;
+
+            hero.flipX = (targetX < hero.x);
+
             currentTween = sceneRef.tweens.add({
-                targets: hero, x: tX, y: tY, duration: 250 * d,
-                onComplete: () => { curGrid = {x:nextTarget.x, y:nextTarget.y}; walk(idx + 1, sX, sY, tW, tH); }
+                targets: hero,
+                x: targetX,
+                y: targetY,
+                duration: 250 * d,
+                onComplete: () => {
+                    curGrid = { x: next.x, y: next.y };
+                    walk(idx + 1, sX, sY, tW, tH);
+                }
             });
         }
 
@@ -90,6 +113,7 @@
                 for (let d of dirs) {
                     let nx = l.x + d.x, ny = l.y + d.y;
                     if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx]===0) {
+                        // Защита от прохождения сквозь углы
                         if (Math.abs(d.x)===1 && Math.abs(d.y)===1 && (levelMap[l.y][nx]===1 || levelMap[ny][l.x]===1)) continue;
                         if (!v.has(nx + "," + ny)) { v.add(nx + "," + ny); q.push([...p, {x: nx, y: ny}]); }
                     }
