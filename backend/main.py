@@ -15,11 +15,12 @@ app.add_middleware(
 
 # Простая база данных в оперативной памяти (пока без SQL)
 # Храним координаты стен: [[r1, c1], [r2, c2]]
+# Находишь game_state и меняешь на это:
 game_state = {
     "walls": [],
     "energy": 100,
+    "hunger": 100, # Добавили голод
     "nurik_pos": {"x": 0, "y": 0}
-}
 
 class WallData(BaseModel):
     r: int
@@ -38,7 +39,12 @@ async def save_wall(wall: WallData):
     else:
         game_state["walls"].append(wall_coord)
     return {"status": "ok", "walls_count": len(game_state["walls"])}
-
+    
+@app.post("/eat")
+async def eat():
+    game_state["hunger"] = 100
+    return {"status": "full", "hunger": 100}
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
