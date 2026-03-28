@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 import json
 
 # Импортируем нашу базу данных из соседнего файла
-from database import SessionLocal, GameSave
+from backend.database import SessionLocal, GameSave
 
 app = FastAPI()
 
