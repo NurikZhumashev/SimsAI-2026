@@ -2,24 +2,15 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Дом Нурика</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sims AI - Полноценный проект</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
-    <style>
-        body { margin: 0; background: #111; overflow: hidden; font-family: sans-serif; }
-        #ui { position: absolute; top: 10px; left: 10px; z-index: 100; display: flex; gap: 10px; }
-        button { padding: 8px 15px; cursor: pointer; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; }
-        button.active { background: #28a745; border-color: #fff; font-weight: bold; }
-        
-        #status-panel { position: absolute; top: 10px; right: 10px; z-index: 100; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; border: 1px solid #444; width: 150px; }
-        .stat-label { color: #aaa; font-size: 11px; margin-bottom: 5px; display: block; text-transform: uppercase; letter-spacing: 1px; }
-        .bar-bg { width: 100%; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
-        #energy-bar { width: 100%; height: 100%; background: #28a745; transition: width 0.3s; }
-    </style>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div id="ui">
-        <button id="wBtn" class="active" onclick="setMode(false)">ХОДИТЬ</button>
-        <button id="bBtn" onclick="setMode(true)">СТРОИТЬ</button>
+        <button id="wBtn" class="active">ХОДИТЬ</button>
+        <button id="bBtn">СТРОИТЬ</button>
     </div>
 
     <div id="status-panel">
@@ -27,165 +18,9 @@
         <div class="bar-bg"><div id="energy-bar"></div></div>
     </div>
 
-    <script>
-        let isBuild = false;
-        let energy = 100;
-
-        function setMode(m) {
-            isBuild = m;
-            document.getElementById('wBtn').className = m ? '' : 'active';
-            document.getElementById('bBtn').className = m ? 'active' : '';
-        }
-
-        function updateEnergyUI() {
-            const bar = document.getElementById('energy-bar');
-            if (!bar) return;
-            bar.style.width = energy + '%';
-            if (energy > 50) bar.style.background = '#28a745';
-            else if (energy > 20) bar.style.background = '#ffc107';
-            else bar.style.background = '#dc3545';
-        }
-
-        const config = {
-            type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight,
-            scene: { preload: preload, create: create, update: update }
-        };
-
-        const game = new Phaser.Game(config);
-        let hero, heroLabel, sceneRef;
-        let curGrid = { x: 0, y: 0 }, movingTo = null, futurePath = [];
-        
-        // 0 - пол, 1 - стена, 2 - кровать
-        const levelMap = Array(8).fill().map(() => Array(8).fill(0));
-        levelMap[7][0] = 2; // Ставим кровать в угол
-
-        function preload() {
-            this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
-            this.load.image('hero', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
-        }
-
-        function create() {
-            sceneRef = this;
-            const sX = window.innerWidth / 2, sY = 150, tW = 32, tH = 16;
-
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    let iX = sX + (c - r) * tW, iY = sY + (c + r) * tH;
-                    let tile = this.add.image(iX, iY, 'tile');
-                    
-                    // Визуализация типов клеток
-                    if (levelMap[r][c] === 1) { 
-                        tile.setTint(0x333333); tile.y -= 4; 
-                    } else if (levelMap[r][c] === 2) {
-                        tile.setTint(0x0000ff); // Кровать синяя
-                    }
-
-                    tile.setInteractive().on('pointerdown', () => {
-                        if (isBuild) {
-                            if ((c === curGrid.x && r === curGrid.y) || levelMap[r][c] === 2) return;
-                            let isWall = levelMap[r][c] === 0;
-                            levelMap[r][c] = isWall ? 1 : 0;
-                            tile.setTint(isWall ? 0x333333 : 0xffffff);
-                            tile.y += isWall ? -4 : 4;
-                        } else {
-                            if (levelMap[r][c] === 1 || energy < 5) return;
-                            let start = movingTo ? movingTo : curGrid;
-                            let path = findPath(start.x, start.y, c, r);
-                            if (path && path.length > 1) {
-                                futurePath = path.slice(1);
-                                if (!movingTo) walk(sX, sY, tW, tH);
-                            }
-                        }
-                    });
-                    
-                    tile.on('pointerover',() => tile.setTint(0x00ff00));
-                    tile.on('pointerout',() => {
-                        if (levelMap[r][c] === 1) tile.setTint(0x333333);
-                        else if (levelMap[r][c] === 2) tile.setTint(0x0000ff);
-                        else tile.clearTint();
-                    });
-                }
-            }
-
-            hero = this.add.sprite(sX, sY, 'hero').setScale(1.5).setOrigin(0.5, 0.8);
-            heroLabel = this.add.text(sX, sY - 45, 'Нурик', { 
-                fontSize: '14px', fill: '#ffffff', backgroundColor: 'rgba(0,0,0,0.6)', padding: { x: 4, y: 2 }
-            }).setOrigin(0.5);
-            
-            updateEnergyUI();
-
-            // Пассивное восстановление
-            setInterval(() => {
-                if (!movingTo && energy < 100) {
-                    energy = Math.min(100, energy + 1);
-                    updateEnergyUI();
-                }
-            }, 1000);
-        }
-
-        function update() {
-            if (hero && heroLabel) {
-                heroLabel.x = hero.x;
-                heroLabel.y = hero.y - 45;
-            }
-        }
-
-        function walk(sX, sY, tW, tH) {
-            if (futurePath.length === 0 || energy <= 0) { 
-                movingTo = null; 
-                return; 
-            }
-
-            movingTo = futurePath.shift();
-            
-            if (levelMap[movingTo.y][movingTo.x] === 1) {
-                movingTo = null; futurePath = []; return;
-            }
-
-            energy -= 2; 
-            updateEnergyUI();
-
-            let d = Math.sqrt(Math.pow(movingTo.x - curGrid.x, 2) + Math.pow(movingTo.y - curGrid.y, 2));
-            let tX = sX + (movingTo.x - movingTo.y) * tW;
-            let tY = sY + (movingTo.x + movingTo.y) * tH;
-
-            hero.flipX = (tX < hero.x);
-
-            sceneRef.tweens.add({
-                targets: hero, x: tX, y: tY, duration: 250 * d,
-                onComplete: () => { 
-                    curGrid = { x: movingTo.x, y: movingTo.y }; 
-                    
-                    // ПРОВЕРКА КРОВАТИ: Если Нурик пришел на синий блок
-                    if (levelMap[curGrid.y][curGrid.x] === 2) {
-                        energy = 100;
-                        updateEnergyUI();
-                        console.log("Нурик выспался!");
-                    }
-                    
-                    walk(sX, sY, tW, tH); 
-                }
-            });
-        }
-
-        function findPath(sx, sy, ex, ey) {
-            let q = [[{x: sx, y: sy}]], v = new Set([sx + "," + sy]);
-            while (q.length > 0) {
-                let p = q.shift(), curr = p[p.length - 1];
-                if (curr.x === ex && curr.y === ey) return p;
-                let dirs = [{x:0,y:1},{x:0,y:-1},{x:1,y:0},{x:-1,y:0},{x:1,y:1},{x:1,y:-1},{x:-1,y:1},{x:-1,y:-1}];
-                for (let d of dirs) {
-                    let nx = curr.x + d.x, ny = curr.y + d.y;
-                    if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx] !== 1) {
-                        if (Math.abs(d.x) === 1 && Math.abs(d.y) === 1) {
-                            if (levelMap[curr.y][nx] === 1 || levelMap[ny][curr.x] === 1) continue;
-                        }
-                        if (!v.has(nx + "," + ny)) { v.add(nx + "," + ny); q.push([...p, {x: nx, y: ny}]); }
-                    }
-                }
-            }
-            return null;
-        }
-    </script>
+    <script src="js/pathfinding.js"></script>
+    <script src="js/nurik.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
 </body>
 </html>
