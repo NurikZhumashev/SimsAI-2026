@@ -11,6 +11,7 @@ let futurePath = [];
 let hero, heroLabel;
 
 // Единый центр связи с сервером
+// Единый центр связи с сервером (Бронированная версия)
 async function performServerAction(actionType) {
     try {
         const res = await fetch(`${BACKEND_URL}/action`, {
@@ -20,11 +21,11 @@ async function performServerAction(actionType) {
         });
         const data = await res.json();
         
-        // Если сервер запретил (нет денег/сил) - показываем красную ошибку
-        if (data.status === "error") {
-            showNotification(data.message, true);
-        } else {
-            // Если всё ок - показываем зеленое сообщение и обновляем статы из БД
+        // Если сервер вернул 500 ошибку или наш кастомный error
+        if (!res.ok || data.status === "error") {
+            showNotification(data.message || "Ошибка на сервере!", true);
+        } else if (data.stats) {
+            // Если всё прошло идеально
             showNotification(data.message, false);
             stars = data.stats.stars;
             energy = data.stats.energy;
@@ -35,6 +36,7 @@ async function performServerAction(actionType) {
         }
     } catch (e) {
         console.error("Ошибка связи с сервером", e);
+        showNotification("Сервер не отвечает!", true);
     }
 }
 
