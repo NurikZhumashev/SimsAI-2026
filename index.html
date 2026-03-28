@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Sims AI - Мои Ассеты</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+    <style> body { margin: 0; background: #222; overflow: hidden; } </style>
+</head>
+<body>
+    <script>
+        const config = {
+            type: Phaser.AUTO,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            physics: { default: 'arcade' },
+            scene: { preload: preload, create: create, update: update }
+        };
+
+        const game = new Phaser.Game(config);
+        let hero;
+        let target = new Phaser.Math.Vector2();
+
+        function preload() {
+            // ВАЖНО: Убедись, что файл лежит в папке assets/hero.png
+            this.load.image('hero', 'assets/hero.png');
+        }
+
+        function create() {
+            // Ставим героя в центр и уменьшаем его, если он огромный
+            hero = this.physics.add.sprite(400, 300, 'hero');
+            hero.setScale(0.5); // 0.5 — это 50% размера. Можешь менять.
+
+            this.input.on('pointerdown', (pointer) => {
+                target.x = pointer.x;
+                target.y = pointer.y;
+                hero.flipX = (target.x < hero.x);
+                this.physics.moveToObject(hero, target, 250);
+            });
+        }
+
+        function update() {
+            let distance = Phaser.Math.Distance.Between(hero.x, hero.y, target.x, target.y);
+            if (hero.body.speed > 0 && distance < 5) {
+                hero.body.reset(target.x, target.y);
+            }
+        }
+    </script>
+</body>
+</html>
