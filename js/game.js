@@ -1,3 +1,18 @@
+// 1. В САМОЕ НАЧАЛО: Адрес твоего сервера
+const BACKEND_URL = "simsai-2026-production.up.railway.app"; 
+
+// 2. ФУНКЦИЯ ЗАГРУЗКИ: Спрашиваем сервер о стенах
+async function loadWallsFromServer() {
+    try {
+        const response = await fetch(`${BACKEND_URL}/get_map`);
+        const data = await response.json();
+        return data.walls; // Возвращает список координат [[r,c], [r,c]]
+    } catch (e) {
+        console.error("Сервер молчит, Нурик живет в памяти браузера");
+        return [];
+    }
+}
+
 const config = {
     type: Phaser.AUTO,
     width: window.innerWidth,
@@ -7,28 +22,47 @@ const config = {
 
 const game = new Phaser.Game(config);
 let levelMap = Array(8).fill().map(() => Array(8).fill(0));
-levelMap[7][0] = 2; // Кровать
+levelMap[7][0] = 2; // Кровать Нурика
 
 function preload() {
     this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
     this.load.image('hero', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
 }
 
-function create() {
+// 3. ДОБАВЛЯЕМ async К CREATE
+async function create() {
     const scene = this;
     const sX = window.innerWidth / 2, sY = 150, tW = 32, tH = 16;
+
+    // 4. ЗАГРУЗКА ДАННЫХ: Ждем ответа от сервера перед отрисовкой
+    const savedWalls = await loadWallsFromServer();
+    savedWalls.forEach(w => {
+        levelMap[w[0]][w[1]] = 1; // Помечаем стены из базы на карте
+    });
 
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
             let iX = sX + (c - r) * tW, iY = sY + (c + r) * tH;
             let tile = this.add.image(iX, iY, 'tile');
             
+            // Отрисовка: Стены (1) или Кровать (2)
             if (levelMap[r][c] === 1) { tile.setTint(0x333333); tile.y -= 4; }
             else if (levelMap[r][c] === 2) { tile.setTint(0x0000ff); }
 
-            tile.setInteractive().on('pointerdown', () => {
+            // 5. ОБНОВЛЯЕМ КЛИК (тоже делаем async)
+            tile.setInteractive().on('pointerdown', async () => {
                 if (isBuild) {
                     if ((c === curGrid.x && r === curGrid.y) || levelMap[r][c] === 2) return;
+                    
+                    // СОХРАНЯЕМ НА БЭКЕНД
+                    try {
+                        await fetch(`${BACKEND_URL}/save_wall`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ r: r, c: c })
+                        });
+                    } catch(e) { console.log("Ошибка сохранения на сервер"); }
+
                     let isWall = levelMap[r][c] === 0;
                     levelMap[r][c] = isWall ? 1 : 0;
                     tile.setTint(isWall ? 0x333333 : 0xffffff);
@@ -43,6 +77,7 @@ function create() {
                     }
                 }
             });
+
             tile.on('pointerover',()=>tile.setTint(0x00ff00)).on('pointerout',()=>{
                 if (levelMap[r][c] === 1) tile.setTint(0x333333);
                 else if (levelMap[r][c] === 2) tile.setTint(0x0000ff);
