@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Свой Интеллект</title>
+    <title>Sims AI - Умный Персонаж</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
@@ -15,6 +15,8 @@
 
         const game = new Phaser.Game(config);
         let hero, heroX = 0, heroY = 0, isMoving = false;
+        
+        // КАРТА: 0 - пол, 1 - стена
         const levelMap = [
             [0,0,0,0,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,0,0,0,0,0,0],
             [0,0,0,0,0,1,0,0], [0,0,0,0,0,1,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0]
@@ -29,17 +31,21 @@
             const startX = window.innerWidth / 2, startY = 150, tW = 32, tH = 16;
             let scene = this;
 
-            // Рисуем пол
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
                     let iX = startX + (x - y) * tW, iY = startY + (x + y) * tH;
                     let tile = this.add.image(iX, iY, 'tile');
-                    if (levelMap[y][x] === 1) { tile.setTint(0x555555); tile.y -= 8; }
-                    else {
+                    
+                    if (levelMap[y][x] === 1) { 
+                        tile.setTint(0x555555); tile.y -= 8; 
+                    } else {
                         tile.setInteractive().on('pointerdown', () => {
                             if (isMoving) return;
                             let path = findPath(heroX, heroY, x, y);
-                            if (path) { isMoving = true; walk(path, 1); }
+                            if (path && path.length > 1) { 
+                                isMoving = true; 
+                                walk(path, 1); 
+                            }
                         });
                         tile.on('pointerover', () => tile.setTint(0x00ff00)).on('pointerout', () => tile.clearTint());
                     }
@@ -48,26 +54,38 @@
 
             hero = this.add.sprite(startX, startY, 'hero').setScale(1.5);
 
-            // ФУНКЦИЯ ДВИЖЕНИЯ
             function walk(path, i) {
                 if (i >= path.length) { isMoving = false; return; }
                 heroX = path[i].x; heroY = path[i].y;
                 let nX = startX + (heroX - heroY) * tW, nY = startY + (heroX + heroY) * tH;
                 hero.flipX = (nX < hero.x);
-                scene.tweens.add({ targets: hero, x: nX, y: nY, duration: 300, onComplete: () => walk(path, i + 1) });
+                scene.tweens.add({ targets: hero, x: nX, y: nY, duration: 250, onComplete: () => walk(path, i + 1) });
             }
         }
 
-        // --- МОЗГИ ПЕРСОНАЖА (Алгоритм поиска пути BFS) ---
+        // --- УЛУЧШЕННЫЕ МОЗГИ (BFS с 8 направлениями и проверкой стен) ---
         function findPath(sx, sy, ex, ey) {
             let queue = [[{x: sx, y: sy}]], visited = new Set([sx + ',' + sy]);
             while (queue.length > 0) {
                 let path = queue.shift(), curr = path[path.length - 1];
                 if (curr.x === ex && curr.y === ey) return path;
-                let dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+                
+                // Направления: ортогональные + диагональные
+                let dirs = [
+                    [0,1],[0,-1],[1,0],[-1,0], // Прямо
+                    [1,1],[1,-1],[-1,1],[-1,-1] // По диагонали
+                ];
+
                 for (let [dx, dy] of dirs) {
                     let nx = curr.x + dx, ny = curr.y + dy;
                     if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx] === 0 && !visited.has(nx + ',' + ny)) {
+                        
+                        // Защита от "прорезания" углов: 
+                        // Если идем по диагонали, соседние клетки тоже должны быть свободны
+                        if (Math.abs(dx) === 1 && Math.abs(dy) === 1) {
+                            if (levelMap[curr.y][nx] !== 0 || levelMap[ny][curr.x] !== 0) continue;
+                        }
+
                         visited.add(nx + ',' + ny);
                         queue.push([...path, {x: nx, y: ny}]);
                     }
