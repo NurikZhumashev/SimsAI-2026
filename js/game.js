@@ -82,11 +82,24 @@ async function create() {
                     tile.setTint(isWall ? 0x333333 : 0xffffff);
                     tile.y += isWall ? -4 : 4;
                 } else {
-                    // Режим ходьбы (Нурик не может ходить по стенам или если нет сил)
+                    // 1. ПАТЧ: Если кликаем на предмет, на котором УЖЕ стоим
+                    if (c === curGrid.x && r === curGrid.y) {
+                        let tType = levelMap[r][c];
+                        if (tType === 2) await performServerAction("sleep");
+                        if (tType === 3) await performServerAction("eat");
+                        if (tType === 4) await performServerAction("work");
+                        if (tType === 5) await performServerAction("shower");
+                        if (tType === 6) await performServerAction("toilet");
+                        return; // Завершаем, ходить не надо
+                    }
+
+                    // 2. Если сил нет, не даем шагать
                     if (levelMap[r][c] === 1 || energy < 5) {
                         if (energy < 5) showNotification("Нурик слишком устал, чтобы идти!", true);
                         return;
                     }
+                    
+                    // 3. Строим путь и идем
                     let path = findPath(curGrid.x, curGrid.y, c, r, levelMap);
                     if (path && path.length > 1) {
                         futurePath = path.slice(1);
