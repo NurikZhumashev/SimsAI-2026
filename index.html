@@ -4,23 +4,17 @@
     <meta charset="UTF-8">
     <title>Sims AI - Умный Поиск Пути</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/easystarjs/0.4.4/easystar-0.4.4.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
 <body>
     <script>
-        // --- ВСТРОЕННАЯ БИБЛИОТЕКА EASYSTAR (Мини-версия) ---
-        // Теперь нам не нужны внешние ссылки для ИИ!
-        var EasyStar=function(){function e(e,t,n){this.x=e,this.y=t,this.type=n}var t={};return t.js=function(){var t,n,r,o,i,a=[],s=0,u=!1,l={};this.setGrid=function(e){t=e},this.setAcceptableTiles=function(e){n=e},this.enableDiagonals=function(){u=!0},this.findPath=function(n,u,l,c,f){var h=new e(n,u),p=new e(l,c);a.push({start:h,end:p,callback:f})},this.calculate=function(){if(0!==a.length){var e=a.shift(),n=e.start,r=e.end,u=e.callback,l=[],c=[],f=function(e,t){return Math.abs(e.x-t.x)+Math.abs(e.y-t.y)};n.g=0,n.f=f(n,r),l.push(n);for(var h=function(e,t){for(var n=[{x:0,y:-1},{x:0,y:1},{x:-1,y:0},{x:1,y:0}],r=[],o=0;o<n.length;o++){var i=e.x+n[o].x,a=e.y+n[o].y;i>=0&&i<t[0].length&&a>=0&&a<t.length&&r.push({x:i,y:a})}return r};l.length>0;){var p=0;for(o=0;o<l.length;o++)l[o].f<l[p].f&&(p=o);var g=l[p];if(g.x===r.x&&g.y===r.y){for(var d=[],v=g;v.parent;)d.push({x:v.x,y:v.y}),v=v.parent;return void u(d.reverse())}l.splice(p,1),c.push(g);var m=h(g,t);for(o=0;o<m.length;o++){var y=m[o],b=!1;for(i=0;i<n.length;i++)if(t[y.y][y.x]===n[i]){b=!0;break}if(b){var w=!1;for(i=0;i<c.length;i++)if(c[i].x===y.x&&c[i].y===y.y){w=!0;break}if(!w){var x=g.g+1,S=!1;for(i=0;i<l.length;i++)if(l[i].x===y.x&&l[i].y===y.y){S=!0,x<l[i].g&&(l[i].g=x,l[i].f=l[i].g+f(l[i],r),l[i].parent=g);break}S||(y.g=x,y.f=y.g+f(y,r),y.parent=g,l.push(y))}}}}}return this},t}();
-
-        // --- САМА ИГРА ---
         const config = {
-            type: Phaser.AUTO,
-            width: window.innerWidth,
-            height: window.innerHeight,
+            type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight,
             scene: { preload: preload, create: create }
         };
 
-        const game = new Phaser.Game(config);
+        new Phaser.Game(config);
         let hero, heroGridX = 0, heroGridY = 0, isMoving = false;
 
         function preload() {
@@ -29,59 +23,45 @@
         }
 
         function create() {
-            const startX = window.innerWidth / 2;
-            const startY = 150;
-            const tileWidth = 32, tileHeight = 16;
+            const startX = window.innerWidth / 2, startY = 150, tW = 32, tH = 16;
             const levelMap = [
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 1, 1, 0, 0, 0, 0],
-                [0, 0, 1, 1, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 1, 0, 0],
-                [0, 0, 0, 0, 0, 1, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0]
+                [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]
             ];
 
             let easystar = new EasyStar.js();
             easystar.setGrid(levelMap);
             easystar.setAcceptableTiles([0]);
+            easystar.enableDiagonals();
 
             let scene = this;
-
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
-                    let isoX = startX + (x - y) * tileWidth;
-                    let isoY = startY + (x + y) * tileHeight;
-                    let tile = this.add.image(isoX, isoY, 'tile');
-
-                    if (levelMap[y][x] === 1) {
-                        tile.setTint(0x555555);
-                        tile.y -= 8;
-                    } else {
-                        tile.setInteractive();
-                        tile.on('pointerover', () => tile.setTint(0x00ff00));
-                        tile.on('pointerout', () => tile.clearTint());
-                        tile.on('pointerdown', () => {
+                    let iX = startX + (x - y) * tW, iY = startY + (x + y) * tH;
+                    let tile = this.add.image(iX, iY, 'tile');
+                    if (levelMap[y][x] === 1) { tile.setTint(0x555555); tile.y -= 8; }
+                    else {
+                        tile.setInteractive().on('pointerdown', () => {
                             if (isMoving) return;
                             easystar.findPath(heroGridX, heroGridY, x, y, (path) => {
                                 if (path) { isMoving = true; moveCharacter(path, 0); }
                             });
                             easystar.calculate();
                         });
+                        tile.on('pointerover', () => tile.setTint(0x00ff00)).on('pointerout', () => tile.clearTint());
                     }
                 }
             }
 
             hero = this.add.sprite(startX, startY, 'hero').setScale(1.5);
-            this.add.text(20, 20, "АВТОНОМНЫЙ ИИ ЗАПУЩЕН.\nКликай за препятствия!", { fontSize: '18px', fill: '#0f0' });
 
             function moveCharacter(path, index) {
                 if (index >= path.length) { isMoving = false; return; }
                 let next = path[index];
                 heroGridX = next.x; heroGridY = next.y;
-                let nX = startX + (next.x - next.y) * tileWidth;
-                let nY = startY + (next.x + next.y) * tileHeight;
+                let nX = startX + (next.x - next.y) * tW, nY = startY + (next.x + next.y) * tH;
                 hero.flipX = (nX < hero.x);
                 scene.tweens.add({
                     targets: hero, x: nX, y: nY, duration: 300,
