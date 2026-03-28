@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Изометрия</title>
+    <title>Sims AI - Шаг по сетке</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
@@ -12,53 +12,91 @@
             type: Phaser.AUTO,
             width: window.innerWidth,
             height: window.innerHeight,
-            scene: { preload: preload, create: create }
+            physics: { default: 'arcade' },
+            scene: { preload: preload, create: create, update: update }
         };
 
         const game = new Phaser.Game(config);
+        
+        let hero;
+        let target = new Phaser.Math.Vector2();
+        let isMoving = false;
 
         function preload() {
-            // Грузим бесплатный тайл пола (ромбик) прямо из интернета
+            // Грузим пол и нашего парня
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
+            this.load.spritesheet('hero', 'assets/modern_walk.png', { frameWidth: 64, frameHeight: 64 });
         }
 
         function create() {
-            // Центрируем нашу комнату на экране
             const startX = window.innerWidth / 2;
             const startY = 150;
-            
-            // Размеры одной плитки (магические числа для изометрии)
-            const tileWidth = 32;  // Шаг вправо/влево
-            const tileHeight = 16; // Шаг вниз/вверх
+            const tileWidth = 32;  
+            const tileHeight = 16; 
 
-            // Строим сетку пола 8х8 (наша первая комната!)
+            // 1. СТРОИМ ПОЛ
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
-                    
-                    // 🧠 ТА САМАЯ ИЗОМЕТРИЧЕСКАЯ ФОРМУЛА:
-                    // Она переводит обычные координаты (x,y) в "ромбовидные"
                     let isoX = startX + (x - y) * tileWidth;
                     let isoY = startY + (x + y) * tileHeight;
 
-                    // Ставим плитку на вычисленное место
                     let tile = this.add.image(isoX, isoY, 'tile');
-                    
-                    // Делаем её интерактивной (чтобы игра понимала клики)
                     tile.setInteractive();
 
-                    // Что происходит при наведении и клике:
-                    tile.on('pointerover', () => tile.setTint(0x00ff00)); // Зеленеет
-                    tile.on('pointerout', () => tile.clearTint());        // Обычная
+                    tile.on('pointerover', () => tile.setTint(0x00ff00));
+                    tile.on('pointerout', () => tile.clearTint());
+                    
+                    // Клик по клетке дает команду персонажу идти ТУДА
                     tile.on('pointerdown', () => {
-                        tile.setTint(0xff0000); // Краснеет при клике
-                        console.log(`Клик по клетке: X:${x}, Y:${y}`);
+                        tile.setTint(0xff0000); 
+                        
+                        // Задаем цель для персонажа
+                        target.x = isoX;
+                        // Поднимаем цель чуть выше центра клетки, чтобы он стоял ногами на полу
+                        target.y = isoY - 16; 
+
+                        hero.flipX = (target.x < hero.x); // Разворот
+                        this.physics.moveToObject(hero, target, 150); // Идем!
+                        
+                        hero.play('walk', true); // Включаем анимацию
+                        isMoving = true;
                     });
                 }
             }
-            
-            this.add.text(20, 20, "SIMS AI: КОМНАТА 8x8 СГЕНЕРИРОВАНА\nВоди мышкой по полу!", { 
-                fontSize: '20px', fill: '#0f0', fontFamily: 'Courier' 
+
+            // 2. СОЗДАЕМ ПЕРСОНАЖА (Ставим его в центр)
+            hero = this.physics.add.sprite(startX, startY, 'hero');
+            hero.setScale(1.5);
+
+            // 3. УЧИМ ЕГО ХОДИТЬ
+            this.anims.create({
+                key: 'idle',
+                frames: this.anims.generateFrameNumbers('hero', { start: 0, end: 0 }),
+                frameRate: 1
             });
+
+            this.anims.create({
+                key: 'walk',
+                frames: this.anims.generateFrameNumbers('hero', { start: 1, end: 8 }),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            hero.play('idle');
+            
+            this.add.text(20, 20, "Кликай по кристаллам, чтобы персонаж шел туда!", { fontSize: '18px', fill: '#0f0' });
+        }
+
+        function update() {
+            // Если идем - проверяем, дошли ли
+            if (isMoving) {
+                let distance = Phaser.Math.Distance.Between(hero.x, hero.y, target.x, target.y);
+                if (distance < 5) {
+                    hero.body.reset(target.x, target.y); // Стоп
+                    hero.play('idle'); // Стойка смирно
+                    isMoving = false;
+                }
+            }
         }
     </script>
 </body>
