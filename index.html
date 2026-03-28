@@ -2,9 +2,8 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Sims AI - Умный Поиск Пути</title>
+    <title>Sims AI - Свой Интеллект</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/easystarjs/0.4.4/easystar-0.4.4.min.js"></script>
     <style> body { margin: 0; background: #222; overflow: hidden; } </style>
 </head>
 <body>
@@ -14,8 +13,12 @@
             scene: { preload: preload, create: create }
         };
 
-        new Phaser.Game(config);
-        let hero, heroGridX = 0, heroGridY = 0, isMoving = false;
+        const game = new Phaser.Game(config);
+        let hero, heroX = 0, heroY = 0, isMoving = false;
+        const levelMap = [
+            [0,0,0,0,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,1,1,0,0,0,0], [0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,1,0,0], [0,0,0,0,0,1,0,0], [0,0,0,0,0,0,0,0], [0,0,0,0,0,0,0,0]
+        ];
 
         function preload() {
             this.load.image('tile', 'https://labs.phaser.io/assets/sprites/diamond.png');
@@ -24,19 +27,9 @@
 
         function create() {
             const startX = window.innerWidth / 2, startY = 150, tW = 32, tH = 16;
-            const levelMap = [
-                [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 0, 0, 0, 0],
-                [0, 0, 1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 1, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]
-            ];
-
-            let easystar = new EasyStar.js();
-            easystar.setGrid(levelMap);
-            easystar.setAcceptableTiles([0]);
-            easystar.enableDiagonals();
-
             let scene = this;
+
+            // Рисуем пол
             for (let y = 0; y < 8; y++) {
                 for (let x = 0; x < 8; x++) {
                     let iX = startX + (x - y) * tW, iY = startY + (x + y) * tH;
@@ -45,10 +38,8 @@
                     else {
                         tile.setInteractive().on('pointerdown', () => {
                             if (isMoving) return;
-                            easystar.findPath(heroGridX, heroGridY, x, y, (path) => {
-                                if (path) { isMoving = true; moveCharacter(path, 0); }
-                            });
-                            easystar.calculate();
+                            let path = findPath(heroX, heroY, x, y);
+                            if (path) { isMoving = true; walk(path, 1); }
                         });
                         tile.on('pointerover', () => tile.setTint(0x00ff00)).on('pointerout', () => tile.clearTint());
                     }
@@ -57,17 +48,32 @@
 
             hero = this.add.sprite(startX, startY, 'hero').setScale(1.5);
 
-            function moveCharacter(path, index) {
-                if (index >= path.length) { isMoving = false; return; }
-                let next = path[index];
-                heroGridX = next.x; heroGridY = next.y;
-                let nX = startX + (next.x - next.y) * tW, nY = startY + (next.x + next.y) * tH;
+            // ФУНКЦИЯ ДВИЖЕНИЯ
+            function walk(path, i) {
+                if (i >= path.length) { isMoving = false; return; }
+                heroX = path[i].x; heroY = path[i].y;
+                let nX = startX + (heroX - heroY) * tW, nY = startY + (heroX + heroY) * tH;
                 hero.flipX = (nX < hero.x);
-                scene.tweens.add({
-                    targets: hero, x: nX, y: nY, duration: 300,
-                    onComplete: () => moveCharacter(path, index + 1)
-                });
+                scene.tweens.add({ targets: hero, x: nX, y: nY, duration: 300, onComplete: () => walk(path, i + 1) });
             }
+        }
+
+        // --- МОЗГИ ПЕРСОНАЖА (Алгоритм поиска пути BFS) ---
+        function findPath(sx, sy, ex, ey) {
+            let queue = [[{x: sx, y: sy}]], visited = new Set([sx + ',' + sy]);
+            while (queue.length > 0) {
+                let path = queue.shift(), curr = path[path.length - 1];
+                if (curr.x === ex && curr.y === ey) return path;
+                let dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+                for (let [dx, dy] of dirs) {
+                    let nx = curr.x + dx, ny = curr.y + dy;
+                    if (nx>=0 && nx<8 && ny>=0 && ny<8 && levelMap[ny][nx] === 0 && !visited.has(nx + ',' + ny)) {
+                        visited.add(nx + ',' + ny);
+                        queue.push([...path, {x: nx, y: ny}]);
+                    }
+                }
+            }
+            return null;
         }
     </script>
 </body>
