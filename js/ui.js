@@ -1,6 +1,6 @@
 // Пока используем ID = 1 для тестов. В будущем возьмем из Telegram.WebApp.initData
 const USER_ID = 1; 
-const API_URL = "https://твой-проект.railway.app"; // ЗАМЕНИ НА СВОЙ URL ИЗ RAILWAY
+const API_URL = "https://simsai-2026-production.up.railway.app"; // ЗАМЕНИ НА СВОЙ URL ИЗ RAILWAY
 
 async function updateStats() {
     try {
