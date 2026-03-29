@@ -1,52 +1,44 @@
-let isBuild = false;
+// Пока используем ID = 1 для тестов. В будущем возьмем из Telegram.WebApp.initData
+const USER_ID = 1; 
+const API_URL = "https://твой-проект.railway.app"; // ЗАМЕНИ НА СВОЙ URL ИЗ RAILWAY
 
-function setMode(m) {
-    isBuild = m;
-    document.getElementById('wBtn').className = m ? '' : 'active';
-    document.getElementById('bBtn').className = m ? 'active' : '';
+async function updateStats() {
+    try {
+        const response = await fetch(`${API_URL}/status/${USER_ID}`);
+        const data = await response.json();
+        
+        document.getElementById('money').innerText = data.money.toFixed(1);
+        document.getElementById('hunger').innerText = data.hunger;
+        document.getElementById('energy').innerText = data.energy;
+        document.getElementById('level').innerText = data.level;
+    } catch (e) {
+        console.error("Ошибка загрузки данных", e);
+    }
 }
 
-// Универсальное обновление всех статов
-function updateUI() {
-    // Обновляем деньги
-    const starsEl = document.getElementById('stars-count');
-    if (starsEl) starsEl.innerText = stars;
+async function doWork() {
+    const btn = document.getElementById('work-btn');
+    btn.disabled = true; // Защита от спама
 
-    // Массив всех наших потребностей и их цветов (хорошо / плохо)
-    const bars = [
-        { id: 'energy-bar', val: energy, colorHigh: '#28a745', colorLow: '#dc3545' },
-        { id: 'hunger-bar', val: hunger, colorHigh: '#00bcd4', colorLow: '#ff5722' },
-        { id: 'hygiene-bar', val: hygiene, colorHigh: '#007bff', colorLow: '#8b4513' },
-        { id: 'bladder-bar', val: bladder, colorHigh: '#ffc107', colorLow: '#dc3545' }
-    ];
+    try {
+        const response = await fetch(`${API_URL}/action/work/${USER_ID}`, { method: 'POST' });
+        const result = await response.json();
 
-    bars.forEach(b => {
-        const el = document.getElementById(b.id);
-        if (el) {
-            el.style.width = Math.max(0, b.val) + '%';
-            el.style.background = b.val > 30 ? b.colorHigh : b.colorLow;
+        if (response.ok) {
+            document.getElementById('char-status').innerText = result.message;
+            updateStats(); // Обновляем цифры после работы
+        } else {
+            alert(result.detail);
         }
-    });
+    } catch (e) {
+        alert("Проблема со связью с сервером");
+    } finally {
+        btn.disabled = false;
+    }
 }
 
-// Система красивых уведомлений от сервера
-function showNotification(msg, isError = false) {
-    const notif = document.getElementById('notification');
-    if (!notif) return;
-    notif.innerText = msg;
-    notif.style.borderColor = isError ? '#ff4444' : '#44ff44';
-    notif.style.color = isError ? '#ff4444' : '#44ff44';
-    notif.style.display = 'block';
-    
-    // Плавное появление
-    setTimeout(() => notif.style.opacity = 1, 10);
-    
-    // Исчезновение через 2.5 секунды
-    setTimeout(() => {
-        notif.style.opacity = 0;
-        setTimeout(() => notif.style.display = 'none', 300);
-    }, 2500);
-}
+// Привязываем клик
+document.getElementById('work-btn').addEventListener('click', doWork);
 
-document.getElementById('wBtn').onclick = () => setMode(false);
-document.getElementById('bBtn').onclick = () => setMode(true);
+// Загружаем данные при старте
+updateStats();
