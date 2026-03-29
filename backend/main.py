@@ -4,7 +4,15 @@ from .database import SessionLocal, User
 import datetime
 
 app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Разрешает запросы с любых сайтов (включая твой GitHub Pages)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Подключаемся к базе
 def get_db():
     db = SessionLocal()
