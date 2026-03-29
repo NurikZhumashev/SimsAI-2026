@@ -1,28 +1,33 @@
-from sqlalchemy import create_engine, Column, Integer, String, JSON
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import datetime
 
-# Создаем файл базы данных sqlite
-SQLALCHEMY_DATABASE_URL = "sqlite:///./nurik_world.db"
+# Создаем базу данных (sqlite локально, или postgres на Railway)
+DATABASE_URL = "sqlite:///./game.db" 
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 Base = declarative_base()
 
-# Таблица нашего мира (хранит статы и карту)
-class GameSave(Base):
-    __tablename__ = "game_saves"
+class User(Base):
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    player_id = Column(String, unique=True, index=True) # Задел под мультиплеер
-    stars = Column(Integer, default=50)   # Стартовый капитал
-    energy = Column(Integer, default=100)
-    hunger = Column(Integer, default=100)
-    hygiene = Column(Integer, default=100) # Гигиена
-    bladder = Column(Integer, default=100) # Нужда
-    walls_data = Column(JSON, default="[]") # Стены храним в JSON
+    username = Column(String, unique=True, index=True)
+    
+    # Основные ресурсы
+    money = Column(Float, default=100.0)    # Стартовый капитал
+    health = Column(Integer, default=100)   # Здоровье (0 = Гейм Овер)
+    hunger = Column(Integer, default=100)   # Сытость (падает со временем)
+    energy = Column(Integer, default=100)   # Энергия для действий
+    
+    # Прогресс
+    level = Column(Integer, default=1)
+    exp = Column(Integer, default=0)
+    
+    # Время (нужно для восстановления энергии и пассивного дохода)
+    last_update = Column(DateTime, default=datetime.datetime.utcnow)
 
-# Команда для создания таблиц при запуске
+# Создаем таблицы
 Base.metadata.create_all(bind=engine)
