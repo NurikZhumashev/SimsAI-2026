@@ -1,35 +1,92 @@
+:root {
+    /* Цвета из темы Telegram (если их нет, используем запасные) */
+    --bg-color: var(--tg-theme-bg-color, #1a1a1a);
+    --secondary-bg: var(--tg-theme-secondary-bg-color, #2d2d2d);
+    --text-color: var(--tg-theme-text-color, #ffffff);
+    --hint-color: var(--tg-theme-hint-color, #aaaaaa);
+    --button-color: var(--tg-theme-button-color, #4caf50);
+    --button-text: var(--tg-theme-button-text-color, #ffffff);
+    --accent-color: #ffcc00;
+}
+
 body {
-    margin: 0; padding: 0; font-family: sans-serif;
-    background: #1a1a1a; color: white; overflow: hidden;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    overflow: hidden; /* Чтобы экран не дергался */
+    user-select: none; /* Чтобы нельзя было случайно выделить текст при кликах */
 }
 
 #app {
-    display: flex; flex-direction: column; height: 100vh;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 
+/* Верхняя панель со статами */
 .stats-bar {
-    display: flex; justify-content: space-around;
-    padding: 15px; background: #2d2d2d; border-bottom: 2px solid #444;
+    display: flex;
+    justify-content: space-around;
+    padding: 20px 10px;
+    background: var(--secondary-bg);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 }
 
+.stat {
+    font-size: 1.1rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Центр экрана */
 .game-screen {
-    flex-grow: 1; display: flex; align-items: center;
-    justify-content: center; text-align: center; padding: 20px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
 }
 
-#char-status { font-size: 1.2rem; margin-bottom: 10px; color: #ffcc00; }
+#char-status {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+    color: var(--accent-color);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
 
+.level-info {
+    font-size: 0.9rem;
+    color: var(--hint-color);
+    background: rgba(255,255,255,0.05);
+    padding: 5px 15px;
+    border-radius: 20px;
+}
+
+/* Панель кнопок */
 .actions-panel {
-    padding: 20px; background: #2d2d2d;
-    display: flex; flex-direction: column; gap: 10px;
+    padding: 20px;
+    background: var(--secondary-bg);
+    border-radius: 20px 20px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
+/* Главная кнопка действия */
 .btn-main {
-    padding: 20px; font-size: 1.1rem; font-weight: bold;
-    background: #4caf50; border: none; border-radius: 12px; color: white;
-}
-
-.btn-main:active { transform: scale(0.98); background: #45a049; }
-
-.secondary-actions { display: flex; gap: 10px; }
-.btn-sub { flex: 1; padding: 10px; background: #444; border: none; color: white; border-radius: 8px; }
+    padding: 22px;
+    font-size: 1.2rem;
+    font-weight: 800;
+    background: var(--button-color);
+    color: var(--button-text);
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 4px 0px #2e7d32; /* Эффект объема */
+    transition: all 0
