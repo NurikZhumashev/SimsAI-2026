@@ -56,3 +56,26 @@ def work(user_id: int, db: Session = Depends(get_db)):
 
     db.commit()
     return {"message": "Вы успешно поработали!", "reward": reward, "new_balance": user.money}
+
+@app.post("/action/rest/{user_id}")
+def rest(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    user.energy = min(100, user.energy + 50) # Спим — +50 энергии
+    user.hunger -= 10 # Пока спал — проголодался
+    
+    db.commit()
+    return {"message": "Вы отлично выспались на картонке!", "new_energy": user.energy}
+
+@app.post("/action/eat/{user_id}")
+def eat(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if user.money < 20:
+        raise HTTPException(status_code=400, detail="Нет денег даже на сухарик.")
+        
+    user.money -= 20
+    user.hunger = min(100, user.hunger + 30)
+    
+    db.commit()
+    return {"message": "Вы съели подозрительный беляш.", "new_hunger": user.hunger}
