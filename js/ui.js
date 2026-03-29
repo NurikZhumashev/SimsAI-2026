@@ -37,6 +37,31 @@ async function doWork() {
     }
 }
 
+async function doRest() {
+    try {
+        const response = await fetch(`${API_URL}/action/rest/${USER_ID}`, { method: 'POST' });
+        const result = await response.json();
+        if (response.ok) {
+            document.getElementById('char-status').innerText = result.message;
+            updateStats();
+        } else { alert(result.detail); }
+    } catch (e) { alert("Ошибка сервера"); }
+}
+
+async function doEat() {
+    try {
+        const response = await fetch(`${API_URL}/action/eat/${USER_ID}`, { method: 'POST' });
+        const result = await response.json();
+        if (response.ok) {
+            document.getElementById('char-status').innerText = result.message;
+            updateStats();
+        } else { alert(result.detail); }
+    } catch (e) { alert("Ошибка сервера"); }
+}
+
+// Привязываем функции к кнопкам (обнови onclick в HTML или добавь слушатели тут)
+document.querySelectorAll('.btn-sub')[0].onclick = doEat; // Кнопка "Магазин"
+document.querySelectorAll('.btn-sub')[1].onclick = doRest; // Кнопка "Сон"
 // Привязываем клик
 document.getElementById('work-btn').addEventListener('click', doWork);
 
