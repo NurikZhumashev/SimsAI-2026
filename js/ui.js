@@ -1,6 +1,13 @@
-// Пока используем ID = 1 для тестов. В будущем возьмем из Telegram.WebApp.initData
-const USER_ID = 1; 
-const API_URL = "https://simsai-2026-production.up.railway.app"; // ЗАМЕНИ НА СВОЙ URL ИЗ RAILWAY
+// Инициализация Telegram WebApp
+const tg = window.Telegram.WebApp;
+tg.expand(); // Расширить на весь экран
+
+// Берем реальный ID пользователя из Телеграма
+const USER_ID = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 1; 
+const API_URL = "https://simsai-2026-production.up.railway.app"; // Твой домен из Railway
+
+// Сообщаем серверу имя игрока, если его нет
+const USERNAME = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.first_name : "Аноним";
 
 async function updateStats() {
     try {
